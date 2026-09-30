@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { authClient } from '#/lib/auth-client'
 
 export type Theme = 'light' | 'dark' | 'system'
 
@@ -20,17 +21,31 @@ const ThemeContext = createContext<{
   setTheme: (theme: Theme) => void
 }>({ theme: DEFAULT_THEME, setTheme: () => {} })
 
+const isTheme = (value: unknown): value is Theme =>
+  value === 'light' || value === 'dark' || value === 'system'
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const { data: session } = authClient.useSession()
   const [theme, setThemeState] = useState<Theme>(DEFAULT_THEME)
+  const profileTheme = session?.user.theme
 
   useEffect(() => {
-    setThemeState((localStorage.getItem(STORAGE_KEY) as Theme | null) ?? DEFAULT_THEME)
+    const stored = localStorage.getItem(STORAGE_KEY)
+    setThemeState(isTheme(stored) ? stored : DEFAULT_THEME)
   }, [])
+
+  useEffect(() => {
+    if (!isTheme(profileTheme)) return
+    localStorage.setItem(STORAGE_KEY, profileTheme)
+    setThemeState(profileTheme)
+    applyTheme(profileTheme)
+  }, [profileTheme])
 
   const setTheme = (next: Theme) => {
     localStorage.setItem(STORAGE_KEY, next)
     setThemeState(next)
     applyTheme(next)
+    if (session) void authClient.updateUser({ theme: next })
   }
 
   return <ThemeContext value={{ theme, setTheme }}>{children}</ThemeContext>

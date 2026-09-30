@@ -66,6 +66,7 @@ DRY and SRP come first. This stack exists for reuse, so agents add as little tec
 - Keep files small and focused. Split when a module does more than one thing.
 - Comments only where the code cannot say it: non-obvious decisions, external specs, workarounds.
 - Run `npm run lint` and `npm run check` before finishing.
+- `convex dev` is usually already running and regenerates `convex/_generated` and pushes functions on save. Assume it is running; run `npx convex dev --once` only when a push is actually needed.
 
 ## Layout
 
