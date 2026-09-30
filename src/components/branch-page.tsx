@@ -3,16 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { ChevronLeft } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
-import { CiJobList } from '#/components/ci-job-list'
 import { CiStatusBadge } from '#/components/ci-status-badge'
 import { CommitLink } from '#/components/commit-link'
 import { HostBadge } from '#/components/host-badge'
 import { PullRequestBadge } from '#/components/pull-request-badge'
-import { RunList } from '#/components/run-list'
-import { TraceCountsBadges } from '#/components/trace-counts-badges'
+import { ScopeActivity } from '#/components/scope-activity'
 import { Skeleton } from '#/components/ui/skeleton'
-import { UploadTracesButton } from '#/components/upload-traces-button'
-import { useScopeCounts } from '#/hooks/use-runs'
 import { branchUrl } from '#/lib/git-host'
 import type { Doc } from '../../convex/_generated/dataModel'
 
@@ -25,7 +21,6 @@ export function BranchPage({
 }) {
   const repoId = repo._id
   const branch = useQuery(convexQuery(api.branches.getBranch, { repoId, name }))
-  const counts = useScopeCounts(repoId, { kind: 'branch', branch: name })
 
   return (
     <div className="flex flex-col gap-4">
@@ -69,13 +64,14 @@ export function BranchPage({
           )}
         </div>
       )}
-      {branch.data && <CiJobList repoId={repoId} sha={branch.data.headSha} />}
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-semibold">Trace runs</h3>
-        <UploadTracesButton repoId={repoId} target={{ branch: name }} />
-      </div>
-      {counts.data && <TraceCountsBadges counts={counts.data} />}
-      <RunList repo={repo} scope={{ kind: 'branch', branch: name }} />
+      {branch.data && (
+        <ScopeActivity
+          repo={repo}
+          scope={{ kind: 'branch', branch: name }}
+          headSha={branch.data.headSha}
+          uploadTarget={{ branch: name }}
+        />
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { BranchCard } from '#/components/branch-card'
 import { InfiniteScrollTrigger } from '#/components/infinite-scroll-trigger'
+import { RepoTabs } from '#/components/repo-tabs'
 import { Button } from '#/components/ui/button'
 import { Label } from '#/components/ui/label'
 import { Skeleton } from '#/components/ui/skeleton'
@@ -26,6 +27,7 @@ export function RepoBranchesPage({ repo }: { repo: Doc<'repos'> }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <RepoTabs repoId={repoId} active="branches" />
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Switch

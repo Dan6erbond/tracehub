@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { traceStatusSchema } from './trace'
+import { httpUrlSchema } from './url'
 
 export const traceUploadItemSchema = z.object({
   file: z.instanceof(File),
@@ -16,7 +17,7 @@ export const createRunFormSchema = z.object({
   externalRunId: z.string().trim(),
   externalJobId: z.string().trim(),
   jobName: z.string().trim(),
-  ciUrl: z.union([z.literal(''), z.url('Enter a valid URL')]),
+  ciUrl: z.union([z.literal(''), httpUrlSchema]),
   pinned: z.boolean(),
   traces: z.array(traceUploadItemSchema).min(1, 'Add at least one trace'),
 })

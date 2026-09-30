@@ -1,4 +1,4 @@
-import { CircleCheck, CircleX, LoaderCircle } from 'lucide-react'
+import { CircleCheck, CircleDashed, CircleX, LoaderCircle } from 'lucide-react'
 import { Badge } from '#/components/ui/badge'
 import type { CiStatus } from '#/lib/schemas/ci-status'
 
@@ -20,10 +20,16 @@ const CI_STATUS_DISPLAY = {
     className:
       'border-warning/30 bg-warning/10 text-warning [&>svg]:animate-spin',
   },
+  unknown: {
+    label: 'Unknown',
+    Icon: CircleDashed,
+    className: 'text-muted-foreground',
+  },
 } as const
 
-export function CiStatusBadge({ status }: { status: CiStatus }) {
-  const { label, Icon, className } = CI_STATUS_DISPLAY[status]
+/** Without a status, the host has not reported the pipeline or job yet. */
+export function CiStatusBadge({ status }: { status?: CiStatus }) {
+  const { label, Icon, className } = CI_STATUS_DISPLAY[status ?? 'unknown']
   return (
     <Badge variant="outline" className={className}>
       <Icon />

@@ -17,8 +17,14 @@ export const useRuns = (repoId: Id<'repos'>, scope: RunScope) =>
 export const useRun = (repoId: Id<'repos'>, runId: Id<'runs'>) =>
   useQuery(convexQuery(api.runs.getRun, { repoId, runId }))
 
+export const TRACES_PAGE_SIZE = 50
+
 export const useTraces = (repoId: Id<'repos'>, runId: Id<'runs'>) =>
-  useQuery(convexQuery(api.traces.listTraces, { repoId, runId }))
+  usePaginatedQuery(
+    api.traces.listTraces,
+    { repoId, runId },
+    { initialNumItems: TRACES_PAGE_SIZE },
+  )
 
 export const useScopeCounts = (repoId: Id<'repos'>, scope: RunScope) =>
   useQuery(convexQuery(api.traces.getScopeCounts, { repoId, scope }))

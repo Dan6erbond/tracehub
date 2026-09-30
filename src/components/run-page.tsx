@@ -6,15 +6,22 @@ import {
   Pin,
   PinOff,
 } from 'lucide-react'
-import { CiStatusBadge } from '#/components/ci-status-badge'
+import { RunCiDetails } from '#/components/run-ci-details'
 import { CommitLink } from '#/components/commit-link'
+import { InfiniteScrollTrigger } from '#/components/infinite-scroll-trigger'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
 import { TraceTable } from '#/components/trace-table'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
 import { UploadTracesButton } from '#/components/upload-traces-button'
-import { useRun, useSetRunPinned, useTraces } from '#/hooks/use-runs'
+import {
+  TRACES_PAGE_SIZE,
+  useRun,
+  useSetRunPinned,
+  useTraces,
+} from '#/hooks/use-runs'
+import { runCiUrl } from '#/lib/git-host'
 import { runName } from '#/lib/run-name'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 
@@ -30,6 +37,7 @@ export function RunPage({
   const traces = useTraces(repoId, runId)
   const setPinned = useSetRunPinned()
   const pinned = run.data?.pinnedAt !== undefined
+  const ciHref = run.data && runCiUrl(repo, run.data)
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,22 +74,16 @@ export function RunPage({
                 <CommitLink repo={repo} sha={run.data.sha} /> ·{' '}
                 {new Date(run.data._creationTime).toLocaleString()}
               </p>
-              {run.data.job && (
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">CI job</span>
-                  <span>{run.data.job.name}</span>
-                  <CiStatusBadge status={run.data.job.status} />
-                </div>
-              )}
+              <RunCiDetails repo={repo} run={run.data} />
               {run.data.description && <p>{run.data.description}</p>}
               <TraceCountsBadges counts={run.data.traceCounts} />
             </div>
             <div className="flex gap-2">
-              {run.data.ciUrl && (
+              {ciHref && (
                 <Button asChild variant="outline">
-                  <a href={run.data.ciUrl} target="_blank" rel="noreferrer">
+                  <a href={ciHref} target="_blank" rel="noreferrer">
                     <ExternalLink />
-                    Pipeline
+                    View in CI
                   </a>
                 </Button>
               )}
@@ -104,8 +106,19 @@ export function RunPage({
               <UploadTracesButton repoId={repoId} target={{ job: runId }} />
             </div>
           </div>
-          {traces.isPending && <Skeleton className="h-32 w-full" />}
-          {traces.data && <TraceTable traces={traces.data} />}
+          {traces.status === 'LoadingFirstPage' && (
+            <Skeleton className="h-32 w-full" />
+          )}
+          {traces.results.length > 0 && (
+            <>
+              <TraceTable traces={traces.results} />
+              <InfiniteScrollTrigger
+                canLoadMore={traces.status === 'CanLoadMore'}
+                isLoading={traces.status === 'LoadingMore'}
+                onLoadMore={() => traces.loadMore(TRACES_PAGE_SIZE)}
+              />
+            </>
+          )}
         </>
       )}
     </div>

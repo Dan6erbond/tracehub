@@ -1,7 +1,9 @@
 import { Octokit } from '@octokit/rest'
+import { toHttpUrl } from '../../../src/lib/schemas/url'
 import { chunk } from '../chunk'
 import type { Branch } from '../../../src/lib/schemas/branch'
 import type { CiJob } from '../../../src/lib/schemas/ci-job'
+import type { CiPipeline } from '../../../src/lib/schemas/ci-pipeline'
 import type { CiStatus } from '../../../src/lib/schemas/ci-status'
 import type {
   PullRequest,
@@ -59,7 +61,6 @@ const PULL_REQUESTS_QUERY = `
           headRefOid
           baseRefName
           isCrossRepository
-          url
           updatedAt
           author { login }
         }
@@ -83,10 +84,9 @@ const COMMIT_JOBS_QUERY = `
                   name
                   status
                   conclusion
-                  detailsUrl
                   startedAt
                   completedAt
-                  checkSuite { workflowRun { databaseId event } }
+                  checkSuite { workflowRun { databaseId } }
                 }
                 ... on StatusContext { context state targetUrl }
               }
@@ -97,6 +97,9 @@ const COMMIT_JOBS_QUERY = `
     }
   }
 `
+
+// Newest workflow runs synced per reload; older runs keep whatever status they were last seen with.
+const PIPELINE_PAGES = 3
 
 // Commits are fetched this many at a time, well below GitHub's concurrent request limit.
 const JOBS_CONCURRENCY = 10
@@ -132,10 +135,9 @@ interface CheckRunNode {
   name: string
   status: string
   conclusion: string | null
-  detailsUrl: string | null
   startedAt: string | null
   completedAt: string | null
-  checkSuite: { workflowRun: { databaseId: number; event: string } | null }
+  checkSuite: { workflowRun: { databaseId: number } | null }
 }
 
 interface StatusContextNode {
@@ -162,6 +164,14 @@ const NO_CONTEXTS: Connection<JobContextNode> = {
 
 const PASSING_CONCLUSIONS = new Set(['SUCCESS', 'NEUTRAL', 'SKIPPED'])
 
+// Check run and workflow run states arrive upper-case from GraphQL and lower-case from REST.
+const toCiStatus = (status: string | null, conclusion: string | null) => {
+  if (status?.toUpperCase() !== 'COMPLETED') return 'pending'
+  return PASSING_CONCLUSIONS.has((conclusion ?? '').toUpperCase())
+    ? 'success'
+    : 'failure'
+}
+
 const toTime = (value: string | null) => (value ? Date.parse(value) : undefined)
 
 const toJob = (sha: string, node: JobContextNode): CiJob => {
@@ -171,19 +181,15 @@ const toJob = (sha: string, node: JobContextNode): CiJob => {
       externalId: node.context,
       name: node.context,
       status: CI_STATUS[node.state],
-      url: node.targetUrl ?? undefined,
+      url: toHttpUrl(node.targetUrl),
     }
   const { workflowRun } = node.checkSuite
-  const passed = PASSING_CONCLUSIONS.has(node.conclusion ?? '')
   return {
     sha,
     externalId: String(node.databaseId),
     name: node.name,
-    status:
-      node.status !== 'COMPLETED' ? 'pending' : passed ? 'success' : 'failure',
+    status: toCiStatus(node.status, node.conclusion),
     pipeline: workflowRun ? String(workflowRun.databaseId) : undefined,
-    trigger: workflowRun?.event,
-    url: node.detailsUrl ?? undefined,
     startedAt: toTime(node.startedAt),
     completedAt: toTime(node.completedAt),
   }
@@ -198,7 +204,6 @@ interface PullRequestNode {
   headRefOid: string
   baseRefName: string
   isCrossRepository: boolean
-  url: string
   updatedAt: string
   author: { login: string } | null
 }
@@ -266,7 +271,6 @@ export const githubAdapter: GitProviderAdapter = {
         baseBranch: node.baseRefName,
         fromFork: node.isCrossRepository,
         author: node.author?.login,
-        htmlUrl: node.url,
         updatedAt: Date.parse(node.updatedAt),
       }))
       const fresh =
@@ -294,5 +298,55 @@ export const githubAdapter: GitProviderAdapter = {
     }
     for (const batch of chunk(shas, JOBS_CONCURRENCY))
       yield (await Promise.all(batch.map(listCommitJobs))).flat()
+  },
+  listPipelines: async function* (accessToken, { owner, name }) {
+    const octokit = new Octokit({ auth: accessToken })
+    const pages = octokit.paginate.iterator(
+      octokit.rest.actions.listWorkflowRunsForRepo,
+      { owner, repo: name, per_page: 100 },
+    )
+    let page = 0
+    for await (const { data } of pages) {
+      yield data.map((run): CiPipeline => {
+        // The typings omit that `head_repository` is null once a fork is deleted.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        const fromFork = run.head_repository?.id !== run.repository.id
+        return {
+          sha: run.head_sha,
+          externalId: String(run.id),
+          name: run.name ?? run.display_title,
+          status: toCiStatus(run.status, run.conclusion),
+          branch: fromFork ? undefined : (run.head_branch ?? undefined),
+          prNumber: run.pull_requests?.[0]?.number,
+          trigger: run.event,
+          startedAt: Date.parse(run.run_started_at ?? run.created_at),
+          completedAt:
+            run.status === 'completed' ? Date.parse(run.updated_at) : undefined,
+        }
+      })
+      if (++page >= PIPELINE_PAGES) return
+    }
+  },
+  listPipelineJobs: async (accessToken, { owner, name }, pipeline) => {
+    const octokit = new Octokit({ auth: accessToken })
+    const jobs = await octokit.paginate(
+      octokit.rest.actions.listJobsForWorkflowRun,
+      {
+        owner,
+        repo: name,
+        run_id: Number(pipeline.externalId),
+        filter: 'latest',
+        per_page: 100,
+      },
+    )
+    return jobs.map((job): CiJob => ({
+      sha: pipeline.sha,
+      externalId: String(job.id),
+      name: job.name,
+      status: toCiStatus(job.status, job.conclusion),
+      pipeline: pipeline.externalId,
+      startedAt: Date.parse(job.started_at),
+      completedAt: job.completed_at ? Date.parse(job.completed_at) : undefined,
+    }))
   },
 }

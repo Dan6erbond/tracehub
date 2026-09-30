@@ -17,6 +17,9 @@ import { Route as AppReposRepoIdRouteImport } from './routes/_app/repos.$repoId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppReposRepoIdIndexRouteImport } from './routes/_app/repos.$repoId.index'
 import { Route as AppReposRepoIdBranchesSplatRouteImport } from './routes/_app/repos.$repoId.branches.$'
+import { Route as AppReposRepoIdJobsJobIdRouteImport } from './routes/_app/repos.$repoId.jobs.$jobId'
+import { Route as AppReposRepoIdPipelinesIndexRouteImport } from './routes/_app/repos.$repoId.pipelines.index'
+import { Route as AppReposRepoIdPipelinesPipelineIdRouteImport } from './routes/_app/repos.$repoId.pipelines.$pipelineId'
 import { Route as AppReposRepoIdPullsNumberRouteImport } from './routes/_app/repos.$repoId.pulls.$number'
 import { Route as AppReposRepoIdRunsRunIdRouteImport } from './routes/_app/repos.$repoId.runs.$runId'
 import { Route as AppReposRepoIdTracesTraceIdRouteImport } from './routes/_app/repos.$repoId.traces.$traceId'
@@ -63,6 +66,23 @@ const AppReposRepoIdBranchesSplatRoute =
     path: '/branches/$',
     getParentRoute: () => AppReposRepoIdRoute,
   } as any)
+const AppReposRepoIdJobsJobIdRoute = AppReposRepoIdJobsJobIdRouteImport.update({
+  id: '/jobs/$jobId',
+  path: '/jobs/$jobId',
+  getParentRoute: () => AppReposRepoIdRoute,
+} as any)
+const AppReposRepoIdPipelinesIndexRoute =
+  AppReposRepoIdPipelinesIndexRouteImport.update({
+    id: '/pipelines/',
+    path: '/pipelines/',
+    getParentRoute: () => AppReposRepoIdRoute,
+  } as any)
+const AppReposRepoIdPipelinesPipelineIdRoute =
+  AppReposRepoIdPipelinesPipelineIdRouteImport.update({
+    id: '/pipelines/$pipelineId',
+    path: '/pipelines/$pipelineId',
+    getParentRoute: () => AppReposRepoIdRoute,
+  } as any)
 const AppReposRepoIdPullsNumberRoute =
   AppReposRepoIdPullsNumberRouteImport.update({
     id: '/pulls/$number',
@@ -101,10 +121,13 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/repos/$repoId/': typeof AppReposRepoIdIndexRoute
   '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
+  '/repos/$repoId/jobs/$jobId': typeof AppReposRepoIdJobsJobIdRoute
+  '/repos/$repoId/pipelines/$pipelineId': typeof AppReposRepoIdPipelinesPipelineIdRoute
   '/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
   '/repos/$repoId/runs/$runId': typeof AppReposRepoIdRunsRunIdRoute
   '/repos/$repoId/traces/$traceId': typeof AppReposRepoIdTracesTraceIdRoute
   '/repos/$repoId/traces/create': typeof AppReposRepoIdTracesCreateRoute
+  '/repos/$repoId/pipelines/': typeof AppReposRepoIdPipelinesIndexRoute
   '/api/repos/$repoId/traces/$traceId/trace.zip': typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
 export interface FileRoutesByTo {
@@ -114,10 +137,13 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/repos/$repoId': typeof AppReposRepoIdIndexRoute
   '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
+  '/repos/$repoId/jobs/$jobId': typeof AppReposRepoIdJobsJobIdRoute
+  '/repos/$repoId/pipelines/$pipelineId': typeof AppReposRepoIdPipelinesPipelineIdRoute
   '/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
   '/repos/$repoId/runs/$runId': typeof AppReposRepoIdRunsRunIdRoute
   '/repos/$repoId/traces/$traceId': typeof AppReposRepoIdTracesTraceIdRoute
   '/repos/$repoId/traces/create': typeof AppReposRepoIdTracesCreateRoute
+  '/repos/$repoId/pipelines': typeof AppReposRepoIdPipelinesIndexRoute
   '/api/repos/$repoId/traces/$traceId/trace.zip': typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
 export interface FileRoutesById {
@@ -130,10 +156,13 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/repos/$repoId/': typeof AppReposRepoIdIndexRoute
   '/_app/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
+  '/_app/repos/$repoId/jobs/$jobId': typeof AppReposRepoIdJobsJobIdRoute
+  '/_app/repos/$repoId/pipelines/$pipelineId': typeof AppReposRepoIdPipelinesPipelineIdRoute
   '/_app/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
   '/_app/repos/$repoId/runs/$runId': typeof AppReposRepoIdRunsRunIdRoute
   '/_app/repos/$repoId/traces/$traceId': typeof AppReposRepoIdTracesTraceIdRoute
   '/_app/repos/$repoId/traces/create': typeof AppReposRepoIdTracesCreateRoute
+  '/_app/repos/$repoId/pipelines/': typeof AppReposRepoIdPipelinesIndexRoute
   '/api/repos/$repoId/traces/$traceId/trace.zip': typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
 export interface FileRouteTypes {
@@ -146,10 +175,13 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/repos/$repoId/'
     | '/repos/$repoId/branches/$'
+    | '/repos/$repoId/jobs/$jobId'
+    | '/repos/$repoId/pipelines/$pipelineId'
     | '/repos/$repoId/pulls/$number'
     | '/repos/$repoId/runs/$runId'
     | '/repos/$repoId/traces/$traceId'
     | '/repos/$repoId/traces/create'
+    | '/repos/$repoId/pipelines/'
     | '/api/repos/$repoId/traces/$traceId/trace.zip'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -159,10 +191,13 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/repos/$repoId'
     | '/repos/$repoId/branches/$'
+    | '/repos/$repoId/jobs/$jobId'
+    | '/repos/$repoId/pipelines/$pipelineId'
     | '/repos/$repoId/pulls/$number'
     | '/repos/$repoId/runs/$runId'
     | '/repos/$repoId/traces/$traceId'
     | '/repos/$repoId/traces/create'
+    | '/repos/$repoId/pipelines'
     | '/api/repos/$repoId/traces/$traceId/trace.zip'
   id:
     | '__root__'
@@ -174,10 +209,13 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/_app/repos/$repoId/'
     | '/_app/repos/$repoId/branches/$'
+    | '/_app/repos/$repoId/jobs/$jobId'
+    | '/_app/repos/$repoId/pipelines/$pipelineId'
     | '/_app/repos/$repoId/pulls/$number'
     | '/_app/repos/$repoId/runs/$runId'
     | '/_app/repos/$repoId/traces/$traceId'
     | '/_app/repos/$repoId/traces/create'
+    | '/_app/repos/$repoId/pipelines/'
     | '/api/repos/$repoId/traces/$traceId/trace.zip'
   fileRoutesById: FileRoutesById
 }
@@ -246,6 +284,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReposRepoIdBranchesSplatRouteImport
       parentRoute: typeof AppReposRepoIdRoute
     }
+    '/_app/repos/$repoId/jobs/$jobId': {
+      id: '/_app/repos/$repoId/jobs/$jobId'
+      path: '/jobs/$jobId'
+      fullPath: '/repos/$repoId/jobs/$jobId'
+      preLoaderRoute: typeof AppReposRepoIdJobsJobIdRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
+    '/_app/repos/$repoId/pipelines/': {
+      id: '/_app/repos/$repoId/pipelines/'
+      path: '/pipelines'
+      fullPath: '/repos/$repoId/pipelines/'
+      preLoaderRoute: typeof AppReposRepoIdPipelinesIndexRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
+    '/_app/repos/$repoId/pipelines/$pipelineId': {
+      id: '/_app/repos/$repoId/pipelines/$pipelineId'
+      path: '/pipelines/$pipelineId'
+      fullPath: '/repos/$repoId/pipelines/$pipelineId'
+      preLoaderRoute: typeof AppReposRepoIdPipelinesPipelineIdRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
     '/_app/repos/$repoId/pulls/$number': {
       id: '/_app/repos/$repoId/pulls/$number'
       path: '/pulls/$number'
@@ -287,19 +346,26 @@ declare module '@tanstack/react-router' {
 interface AppReposRepoIdRouteChildren {
   AppReposRepoIdIndexRoute: typeof AppReposRepoIdIndexRoute
   AppReposRepoIdBranchesSplatRoute: typeof AppReposRepoIdBranchesSplatRoute
+  AppReposRepoIdJobsJobIdRoute: typeof AppReposRepoIdJobsJobIdRoute
+  AppReposRepoIdPipelinesPipelineIdRoute: typeof AppReposRepoIdPipelinesPipelineIdRoute
   AppReposRepoIdPullsNumberRoute: typeof AppReposRepoIdPullsNumberRoute
   AppReposRepoIdRunsRunIdRoute: typeof AppReposRepoIdRunsRunIdRoute
   AppReposRepoIdTracesTraceIdRoute: typeof AppReposRepoIdTracesTraceIdRoute
   AppReposRepoIdTracesCreateRoute: typeof AppReposRepoIdTracesCreateRoute
+  AppReposRepoIdPipelinesIndexRoute: typeof AppReposRepoIdPipelinesIndexRoute
 }
 
 const AppReposRepoIdRouteChildren: AppReposRepoIdRouteChildren = {
   AppReposRepoIdIndexRoute: AppReposRepoIdIndexRoute,
   AppReposRepoIdBranchesSplatRoute: AppReposRepoIdBranchesSplatRoute,
+  AppReposRepoIdJobsJobIdRoute: AppReposRepoIdJobsJobIdRoute,
+  AppReposRepoIdPipelinesPipelineIdRoute:
+    AppReposRepoIdPipelinesPipelineIdRoute,
   AppReposRepoIdPullsNumberRoute: AppReposRepoIdPullsNumberRoute,
   AppReposRepoIdRunsRunIdRoute: AppReposRepoIdRunsRunIdRoute,
   AppReposRepoIdTracesTraceIdRoute: AppReposRepoIdTracesTraceIdRoute,
   AppReposRepoIdTracesCreateRoute: AppReposRepoIdTracesCreateRoute,
+  AppReposRepoIdPipelinesIndexRoute: AppReposRepoIdPipelinesIndexRoute,
 }
 
 const AppReposRepoIdRouteWithChildren = AppReposRepoIdRoute._addFileChildren(

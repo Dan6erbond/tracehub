@@ -18,16 +18,15 @@ function display({ state, draft }: Pick<PullRequest, 'state' | 'draft'>) {
   return { variant: 'outline', Icon: GitPullRequest } as const
 }
 
-/** Links to the PR page in TraceHub when `repoId` is given, to the Git host when `external` is set. */
+/** Links to the PR page in TraceHub when `repoId` is given, to the Git host when `href` is set. */
 export function PullRequestBadge({
   pullRequest,
   repoId,
-  external,
+  href,
 }: {
-  pullRequest: Pick<PullRequest, 'number' | 'title' | 'state' | 'draft'> &
-    Partial<Pick<PullRequest, 'htmlUrl'>>
+  pullRequest: Pick<PullRequest, 'number' | 'title' | 'state' | 'draft'>
   repoId?: Id<'repos'>
-  external?: boolean
+  href?: string
 }) {
   const { variant, Icon } = display(pullRequest)
   const content = (
@@ -35,10 +34,10 @@ export function PullRequestBadge({
       <Icon />#{pullRequest.number}
     </>
   )
-  if (external && pullRequest.htmlUrl)
+  if (href)
     return (
       <Badge asChild variant={variant} title={pullRequest.title}>
-        <a href={pullRequest.htmlUrl} target="_blank" rel="noreferrer">
+        <a href={href} target="_blank" rel="noreferrer">
           {content}
         </a>
       </Badge>

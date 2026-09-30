@@ -28,8 +28,9 @@ triggers.register('repos', async (ctx, change) => {
 triggers.register('traces', tracesByRun.trigger())
 
 // Traces without a branch or pull request are not part of those aggregates, so the counts never mix them in under a placeholder key.
-const branchTrigger = tracesByBranch.trigger()
-const pullTrigger = tracesByPull.trigger()
+// Idempotent because a run adopts the branch and pull request of its pipeline after the fact, which moves its traces into these aggregates on update.
+const branchTrigger = tracesByBranch.idempotentTrigger()
+const pullTrigger = tracesByPull.idempotentTrigger()
 triggers.register('traces', async (ctx, change) => {
   const trace = change.newDoc ?? change.oldDoc
   if (trace.branch !== undefined) await branchTrigger(ctx, change)

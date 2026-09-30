@@ -16,9 +16,11 @@ import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
 import { gitProviders } from './lib/gitProviders'
 import { loadRepositories } from './lib/gitProviders/loadRepositories'
 import { repoActivityAt } from './lib/repoActivity'
-import type { Doc } from './_generated/dataModel'
+import { replaceOrInsert } from './lib/upsert'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { gitProviderSchema, repoSchema } from '../src/lib/schemas/repo'
+import type { PullRequest } from '../src/lib/schemas/pull-request'
+import type { Doc, Id } from './_generated/dataModel'
 
 const PRUNE_JOBS_SHA_BATCH_SIZE = 25
 
@@ -48,19 +50,25 @@ export const listRepos = authedQuery({
   },
 })
 
-export const upsertRepo = zInternalMutation({
-  args: { repo: repoSchema },
-  handler: async (ctx, { repo }) => {
-    const existing = await ctx.db
+export const findByExternalId = zInternalQuery({
+  args: { provider: gitProviderSchema, externalId: z.string() },
+  handler: (ctx, { provider, externalId }) =>
+    ctx.db
       .query('repos')
       .withIndex('by_provider_externalId', (q) =>
-        q.eq('provider', repo.provider).eq('externalId', repo.externalId),
+        q.eq('provider', provider).eq('externalId', externalId),
       )
-      .unique()
-    if (!existing) return ctx.db.insert('repos', repo)
-    // replace (not patch) so fields the host dropped, e.g. a description, are cleared
-    await ctx.db.replace('repos', existing._id, repo)
-    return existing._id
+      .unique(),
+})
+
+export const upsertRepo = zInternalMutation({
+  args: { repo: repoSchema },
+  handler: async (ctx, { repo }): Promise<Id<'repos'>> => {
+    const existing: Doc<'repos'> | null = await ctx.runQuery(
+      internal.repos.findByExternalId,
+      { provider: repo.provider, externalId: repo.externalId },
+    )
+    return replaceOrInsert(ctx, 'repos', existing, repo)
   },
 })
 
@@ -142,17 +150,28 @@ export const reloadRepo = repoAction({
         before: startedAt,
       })
 
+    // Fetched completely before anything is stored, then stored oldest first: the next reload resumes
+    // after the newest stored pull request, so an interrupted run must never leave newer ones behind older gaps.
     const since = await ctx.runQuery(internal.pullRequests.latestUpdatedAt, {
       repoId,
     })
+    const pullRequestPages: Array<Array<PullRequest>> = []
     for await (const pullRequests of adapter.listPullRequests(
       accessToken,
       ctx.repo,
       since ?? undefined,
     ))
+      pullRequestPages.push(pullRequests)
+    for (const pullRequests of pullRequestPages.reverse())
       await ctx.runMutation(internal.pullRequests.upsertPullRequests, {
         repoId,
         pullRequests,
+      })
+
+    for await (const pipelines of adapter.listPipelines(accessToken, ctx.repo))
+      await ctx.runMutation(internal.ciPipelines.upsertPipelines, {
+        repoId,
+        pipelines,
       })
 
     const shas: Array<string> = await ctx.runQuery(internal.ciJobs.headShas, {

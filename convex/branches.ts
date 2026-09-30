@@ -1,10 +1,10 @@
 import { z } from 'zod'
-import { asyncMap } from 'convex-helpers'
 import { stream } from 'convex-helpers/server/stream'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
 import schema from './schema'
-import { repoQuery, zInternalMutation } from './lib/functions'
+import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
+import { replaceOrInsert } from './lib/upsert'
 import { branchSchema } from '../src/lib/schemas/branch'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import type { Doc } from './_generated/dataModel'
@@ -23,14 +23,45 @@ const withOpenPullRequests = async (ctx: QueryCtx, branch: Doc<'branches'>) => {
   return { ...branch, pullRequests }
 }
 
-export const getBranch = repoQuery({
-  args: { name: z.string() },
-  handler: async (ctx, { repoId, name }) => {
-    const branch = await ctx.db
+/** The CI status of a branch is that of its latest pipeline, falling back to the host's rollup of the head commit (commit statuses). */
+const withCiStatus = async (
+  ctx: QueryCtx,
+  branch: Doc<'branches'>,
+): Promise<Doc<'branches'>> => {
+  const latest: Doc<'ciPipelines'> | null = await ctx.runQuery(
+    internal.ciPipelines.latestForBranch,
+    { repoId: branch.repoId, branch: branch.name },
+  )
+  return { ...branch, ciStatus: latest?.status ?? branch.ciStatus }
+}
+
+export type BranchWithDetails = Doc<'branches'> & {
+  pullRequests: Array<Doc<'pullRequests'>>
+}
+
+const withBranchDetails = async (
+  ctx: QueryCtx,
+  branch: Doc<'branches'>,
+): Promise<BranchWithDetails> =>
+  withOpenPullRequests(ctx, await withCiStatus(ctx, branch))
+
+export const findByName = zInternalQuery({
+  args: { repoId: zid('repos'), name: z.string() },
+  handler: (ctx, { repoId, name }) =>
+    ctx.db
       .query('branches')
       .withIndex('by_repo_name', (q) => q.eq('repoId', repoId).eq('name', name))
-      .unique()
-    return branch && withOpenPullRequests(ctx, branch)
+      .unique(),
+})
+
+export const getBranch = repoQuery({
+  args: { name: z.string() },
+  handler: async (ctx, { repoId, name }): Promise<BranchWithDetails | null> => {
+    const branch: Doc<'branches'> | null = await ctx.runQuery(
+      internal.branches.findByName,
+      { repoId, name },
+    )
+    return branch && withBranchDetails(ctx, branch)
   },
 })
 
@@ -45,7 +76,7 @@ export const listBranches = repoQuery({
       .withIndex('by_repo_committedAt', (q) => q.eq('repoId', repoId))
       .order('desc')
       .map(async (branch) => {
-        const withPullRequests = await withOpenPullRequests(ctx, branch)
+        const withPullRequests = await withBranchDetails(ctx, branch)
         if (openPullRequestsOnly && withPullRequests.pullRequests.length === 0)
           return null
         return withPullRequests
@@ -63,17 +94,17 @@ export const upsertBranches = zInternalMutation({
     syncedAt: z.number(),
   },
   handler: async (ctx, { repoId, branches, syncedAt }) => {
-    await asyncMap(branches, async (branch) => {
-      const existing = await ctx.db
-        .query('branches')
-        .withIndex('by_repo_name', (q) =>
-          q.eq('repoId', repoId).eq('name', branch.name),
-        )
-        .unique()
-      const doc = { repoId, ...branch, syncedAt }
-      if (existing) await ctx.db.replace('branches', existing._id, doc)
-      else await ctx.db.insert('branches', doc)
-    })
+    for (const branch of branches) {
+      const existing: Doc<'branches'> | null = await ctx.runQuery(
+        internal.branches.findByName,
+        { repoId, name: branch.name },
+      )
+      await replaceOrInsert(ctx, 'branches', existing, {
+        repoId,
+        ...branch,
+        syncedAt,
+      })
+    }
   },
 })
 

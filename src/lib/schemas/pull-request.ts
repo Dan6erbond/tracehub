@@ -14,7 +14,6 @@ export const pullRequestSchema = z.object({
   // Fork PRs can reuse a branch name of the base repo, so they never attach to a branch.
   fromFork: z.boolean(),
   author: z.string().optional(),
-  htmlUrl: z.string(),
   updatedAt: z.number(),
 })
 export type PullRequest = z.infer<typeof pullRequestSchema>

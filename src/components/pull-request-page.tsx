@@ -4,14 +4,11 @@ import { convexQuery } from '@convex-dev/react-query'
 import { ChevronLeft, MoveRight } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
 import { BranchBadge } from '#/components/branch-badge'
-import { CiJobList } from '#/components/ci-job-list'
 import { CommitLink } from '#/components/commit-link'
 import { PullRequestBadge } from '#/components/pull-request-badge'
-import { RunList } from '#/components/run-list'
-import { TraceCountsBadges } from '#/components/trace-counts-badges'
+import { ScopeActivity } from '#/components/scope-activity'
 import { Skeleton } from '#/components/ui/skeleton'
-import { UploadTracesButton } from '#/components/upload-traces-button'
-import { useScopeCounts } from '#/hooks/use-runs'
+import { pullUrl } from '#/lib/git-host'
 import type { Doc } from '../../convex/_generated/dataModel'
 
 export function PullRequestPage({
@@ -25,7 +22,6 @@ export function PullRequestPage({
   const pullRequest = useQuery(
     convexQuery(api.pullRequests.getPullRequest, { repoId, number }),
   )
-  const counts = useScopeCounts(repoId, { kind: 'pull', number })
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,7 +40,10 @@ export function PullRequestPage({
       {pullRequest.data && (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <PullRequestBadge pullRequest={pullRequest.data} external />
+            <PullRequestBadge
+              pullRequest={pullRequest.data}
+              href={pullUrl(repo, number)}
+            />
             <h2 className="text-xl font-semibold">{pullRequest.data.title}</h2>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -63,14 +62,13 @@ export function PullRequestPage({
         </div>
       )}
       {pullRequest.data && (
-        <CiJobList repoId={repoId} sha={pullRequest.data.headSha} />
+        <ScopeActivity
+          repo={repo}
+          scope={{ kind: 'pull', number }}
+          headSha={pullRequest.data.headSha}
+          uploadTarget={{ pull: number }}
+        />
       )}
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-semibold">Trace runs</h3>
-        <UploadTracesButton repoId={repoId} target={{ pull: number }} />
-      </div>
-      {counts.data && <TraceCountsBadges counts={counts.data} />}
-      <RunList repo={repo} scope={{ kind: 'pull', number }} />
     </div>
   )
 }

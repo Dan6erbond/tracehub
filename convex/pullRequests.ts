@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import { asyncMap } from 'convex-helpers'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
 import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
+import { replaceOrInsert } from './lib/upsert'
 import { pullRequestSchema } from '../src/lib/schemas/pull-request'
 import type { Doc } from './_generated/dataModel'
 
@@ -56,16 +56,15 @@ export const upsertPullRequests = zInternalMutation({
     pullRequests: z.array(pullRequestSchema),
   },
   handler: async (ctx, { repoId, pullRequests }) => {
-    await asyncMap(pullRequests, async (pullRequest) => {
-      const existing = await ctx.db
-        .query('pullRequests')
-        .withIndex('by_repo_number', (q) =>
-          q.eq('repoId', repoId).eq('number', pullRequest.number),
-        )
-        .unique()
-      const doc = { repoId, ...pullRequest }
-      if (existing) await ctx.db.replace('pullRequests', existing._id, doc)
-      else await ctx.db.insert('pullRequests', doc)
-    })
+    for (const pullRequest of pullRequests) {
+      const existing: Doc<'pullRequests'> | null = await ctx.runQuery(
+        internal.pullRequests.getByNumber,
+        { repoId, number: pullRequest.number },
+      )
+      await replaceOrInsert(ctx, 'pullRequests', existing, {
+        repoId,
+        ...pullRequest,
+      })
+    }
   },
 })

@@ -11,17 +11,19 @@ import {
   CardHeader,
   CardTitle,
 } from '#/components/ui/card'
+import { runCiUrl } from '#/lib/git-host'
 import { runName } from '#/lib/run-name'
-import type { RunWithCounts } from '../../convex/runs'
+import type { RunDetail } from '../../convex/runs'
 import type { Repo } from '#/lib/schemas/repo'
 
 export function RunCard({
   run,
   repo,
 }: {
-  run: RunWithCounts
+  run: RunDetail
   repo: Pick<Repo, 'provider' | 'htmlUrl'>
 }) {
+  const ciHref = runCiUrl(repo, run)
   return (
     <Card className="relative transition-colors hover:bg-accent/50">
       <CardHeader>
@@ -41,10 +43,10 @@ export function RunCard({
           <CommitLink repo={repo} sha={run.sha} /> ·{' '}
           {new Date(run._creationTime).toLocaleString()}
         </CardDescription>
-        {run.ciUrl && (
+        {ciHref && (
           <CardAction>
             <a
-              href={run.ciUrl}
+              href={ciHref}
               target="_blank"
               rel="noreferrer"
               aria-label="Open pipeline"
