@@ -119,6 +119,21 @@ export const dropPullRequestUrl = migrations.define({
     pullRequest.htmlUrl === undefined ? undefined : { htmlUrl: undefined },
 })
 
+// Pull requests carried no timestamp of closing, so `updatedAt` stands in until the next sync of that pull request.
+export const migratePullRequestState = migrations.define({
+  table: 'pullRequests',
+  migrateOne: (_ctx, pullRequest): Partial<Doc<'pullRequests'>> | undefined => {
+    if (pullRequest.state === undefined) return undefined
+    return {
+      state: undefined,
+      closedAt:
+        pullRequest.state === 'open' ? undefined : pullRequest.updatedAt,
+      mergedAt:
+        pullRequest.state === 'merged' ? pullRequest.updatedAt : undefined,
+    }
+  },
+})
+
 export const runAll = migrations.runner([
   internal.migrations.backfillUserRepoFullName,
   internal.migrations.migrateJobPipelines,
@@ -127,4 +142,5 @@ export const runAll = migrations.runner([
   internal.migrations.migrateRunsByJobName,
   internal.migrations.migrateRunsByCiUrl,
   internal.migrations.dropPullRequestUrl,
+  internal.migrations.migratePullRequestState,
 ])

@@ -16,7 +16,7 @@ export const listOpenForBranch = zInternalQuery({
           .eq('repoId', repoId)
           .eq('fromFork', false)
           .eq('headBranch', branchName)
-          .eq('state', 'open'),
+          .eq('closedAt', undefined),
       )
       .collect(),
 })

@@ -9,10 +9,14 @@ import { Badge } from '#/components/ui/badge'
 import type { Id } from '../../convex/_generated/dataModel'
 import type { PullRequest } from '#/lib/schemas/pull-request'
 
-function display({ state, draft }: Pick<PullRequest, 'state' | 'draft'>) {
-  if (state === 'merged')
+function display({
+  closedAt,
+  mergedAt,
+  draft,
+}: Pick<PullRequest, 'closedAt' | 'mergedAt' | 'draft'>) {
+  if (mergedAt !== undefined)
     return { variant: 'secondary', Icon: GitMerge } as const
-  if (state === 'closed')
+  if (closedAt !== undefined)
     return { variant: 'destructive', Icon: GitPullRequestClosed } as const
   if (draft) return { variant: 'secondary', Icon: GitPullRequestDraft } as const
   return { variant: 'outline', Icon: GitPullRequest } as const
@@ -24,7 +28,10 @@ export function PullRequestBadge({
   repoId,
   href,
 }: {
-  pullRequest: Pick<PullRequest, 'number' | 'title' | 'state' | 'draft'>
+  pullRequest: Pick<
+    PullRequest,
+    'number' | 'title' | 'closedAt' | 'mergedAt' | 'draft'
+  >
   repoId?: Id<'repos'>
   href?: string
 }) {

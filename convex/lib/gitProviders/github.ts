@@ -5,10 +5,7 @@ import type { Branch } from '../../../src/lib/schemas/branch'
 import type { CiJob } from '../../../src/lib/schemas/ci-job'
 import type { CiPipeline } from '../../../src/lib/schemas/ci-pipeline'
 import type { CiStatus } from '../../../src/lib/schemas/ci-status'
-import type {
-  PullRequest,
-  PullRequestState,
-} from '../../../src/lib/schemas/pull-request'
+import type { PullRequest } from '../../../src/lib/schemas/pull-request'
 import type { GitProviderAdapter } from './types'
 
 interface Connection<TNode> {
@@ -62,6 +59,8 @@ const PULL_REQUESTS_QUERY = `
           baseRefName
           isCrossRepository
           updatedAt
+          closedAt
+          mergedAt
           author { login }
         }
       }
@@ -112,12 +111,6 @@ const CI_STATUS: Record<RollupState, CiStatus> = {
   ERROR: 'failure',
   PENDING: 'pending',
   EXPECTED: 'pending',
-}
-
-const PULL_REQUEST_STATE: Record<string, PullRequestState> = {
-  OPEN: 'open',
-  CLOSED: 'closed',
-  MERGED: 'merged',
 }
 
 interface BranchNode {
@@ -198,13 +191,14 @@ const toJob = (sha: string, node: JobContextNode): CiJob => {
 interface PullRequestNode {
   number: number
   title: string
-  state: string
   isDraft: boolean
   headRefName: string
   headRefOid: string
   baseRefName: string
   isCrossRepository: boolean
   updatedAt: string
+  closedAt: string | null
+  mergedAt: string | null
   author: { login: string } | null
 }
 
@@ -264,7 +258,6 @@ export const githubAdapter: GitProviderAdapter = {
       const pullRequests: Array<PullRequest> = nodes.map((node) => ({
         number: node.number,
         title: node.title,
-        state: PULL_REQUEST_STATE[node.state],
         draft: node.isDraft,
         headBranch: node.headRefName,
         headSha: node.headRefOid,
@@ -272,6 +265,8 @@ export const githubAdapter: GitProviderAdapter = {
         fromFork: node.isCrossRepository,
         author: node.author?.login,
         updatedAt: Date.parse(node.updatedAt),
+        closedAt: node.closedAt ? Date.parse(node.closedAt) : undefined,
+        mergedAt: node.mergedAt ? Date.parse(node.mergedAt) : undefined,
       }))
       const fresh =
         since === undefined

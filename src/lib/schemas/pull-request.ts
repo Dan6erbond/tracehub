@@ -1,12 +1,8 @@
 import { z } from 'zod'
 
-export const pullRequestStateSchema = z.enum(['open', 'closed', 'merged'])
-export type PullRequestState = z.infer<typeof pullRequestStateSchema>
-
 export const pullRequestSchema = z.object({
   number: z.number(),
   title: z.string(),
-  state: pullRequestStateSchema,
   draft: z.boolean(),
   headBranch: z.string(),
   headSha: z.string(),
@@ -15,5 +11,8 @@ export const pullRequestSchema = z.object({
   fromFork: z.boolean(),
   author: z.string().optional(),
   updatedAt: z.number(),
+  // Open while unset; a merged pull request is closed too.
+  closedAt: z.number().optional(),
+  mergedAt: z.number().optional(),
 })
 export type PullRequest = z.infer<typeof pullRequestSchema>

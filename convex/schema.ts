@@ -50,11 +50,13 @@ export default defineSchema({
     ...zodToConvexFields(pullRequestSchema.shape),
     // Legacy: links are derived from the repo now. Dropped once migrations.dropPullRequestUrl has run everywhere.
     htmlUrl: v.optional(v.string()),
+    // Legacy: replaced by `closedAt` and `mergedAt`. Dropped once migrations.migratePullRequestState has run everywhere.
+    state: v.optional(v.string()),
   })
     .index('by_repo_number', ['repoId', 'number'])
     .index('by_repo_updatedAt', ['repoId', 'updatedAt'])
-    .index('by_repo_state_updatedAt', ['repoId', 'state', 'updatedAt'])
-    .index('by_repo_head', ['repoId', 'fromFork', 'headBranch', 'state']),
+    .index('by_repo_closedAt_updatedAt', ['repoId', 'closedAt', 'updatedAt'])
+    .index('by_repo_head', ['repoId', 'fromFork', 'headBranch', 'closedAt']),
   ciJobs: defineTable({
     repoId: v.id('repos'),
     ...zodToConvexFields(ciJobSchema.omit({ pipeline: true }).shape),

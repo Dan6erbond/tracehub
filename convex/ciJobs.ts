@@ -58,8 +58,8 @@ export const headShas = zInternalQuery({
       .take(MAX_HEADS_PER_SOURCE)
     const pullRequests = await ctx.db
       .query('pullRequests')
-      .withIndex('by_repo_state_updatedAt', (q) =>
-        q.eq('repoId', repoId).eq('state', 'open'),
+      .withIndex('by_repo_closedAt_updatedAt', (q) =>
+        q.eq('repoId', repoId).eq('closedAt', undefined),
       )
       .order('desc')
       .take(MAX_HEADS_PER_SOURCE)
