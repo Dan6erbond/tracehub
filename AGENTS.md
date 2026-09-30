@@ -1,13 +1,16 @@
 <!-- intent-skills:start -->
+
 ## Skill Loading
 
 Use the repository’s installed Intent. If it is unavailable, report the missing dependency instead of downloading a replacement.
 Before editing files for a substantial task:
+
 - Run `npm exec --no -- intent list` from the workspace root to see available local skills.
 - If a listed skill matches the task, run `npm exec --no -- intent load <package>#<skill>` before changing files.
 - Use the loaded `SKILL.md` guidance while making the change.
 - Monorepos: when working across packages, run the skill check from the workspace root and prefer the local skill for the package being changed.
 - Multiple matches: prefer the most specific local skill for the package or concern you are changing; load additional skills only when the task spans multiple packages or concerns.
+
 <!-- intent-skills:end -->
 
 # TraceHub
@@ -47,7 +50,7 @@ DRY and SRP come first. This stack exists for reuse, so agents add as little tec
 ### Convex functions
 
 - One function, one responsibility. Compose them: an `updateX` reuses `getX` for lookup and access checks instead of duplicating the query logic.
-- Extract shared logic (access checks, lookups, mappers) into plain helper functions taking `ctx`, and call them from queries, mutations, and HTTP actions. HTTP actions stay thin: parse, authenticate, delegate to internal functions.
+- Internal queries and mutations (`zInternalQuery`/`zInternalMutation`) are always the preferred shape for shared logic (lookups, mappers, counts) and are called via `ctx.runQuery`/`ctx.runMutation` from queries, mutations, actions, and HTTP actions. Performance is not a reason to fall back to a plain helper taking `ctx`; use one only when an internal function is not possible (e.g. transactions or typing prevent it) or after the user agrees to the exception. Plain helpers for `ActionCtx` that only talk to external services (Better Auth, Git hosts) are such an exception, since an internal action per call would add an action-to-action invocation. Mappers that load relations onto rows (e.g. `withOpenPullRequests`, `withTraceCounts`) are another: they are plain helpers that call internal queries, since inlining them at every call site is less DRY. HTTP actions stay thin: parse, authenticate, delegate to internal functions.
 - Auth and repo-permission wrappers are custom builders layered on top of the Zod builders (`zCustomQuery`/`zCustomMutation` via `customCtx`), so every function keeps Zod validation and gets auth context without repeating checks. Never build them on the plain `query`/`mutation`.
 - Follow the Convex rules in `.cursorrules` (validators, indexes, function syntax).
 
