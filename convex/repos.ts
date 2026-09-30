@@ -5,17 +5,37 @@ import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
 import schema from './schema'
 import { authedAction, authedQuery, zInternalMutation } from './lib/functions'
+import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
+import { gitProviders } from './lib/gitProviders'
 import { loadRepositories } from './lib/gitProviders/loadRepositories'
+import { repoActivityAt } from './lib/repoActivity'
+import { requireRepo } from './lib/requireRepo'
+import type { Doc } from './_generated/dataModel'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { gitProviderSchema, repoSchema } from '../src/lib/schemas/repo'
 
 export const listRepos = authedQuery({
-  args: { paginationOpts: paginationOptsSchema },
-  handler: async (ctx, { paginationOpts }) => {
+  args: { search: z.string().optional(), paginationOpts: paginationOptsSchema },
+  handler: async (ctx, { search, paginationOpts }) => {
+    const term = search?.trim()
+    const getRepoOfLink = (link: Doc<'userRepos'>) =>
+      ctx.db.get('repos', link.repoId)
+    if (term) {
+      // Streams can't wrap a search index; results are ordered by relevance, not by activity.
+      const links = await ctx.db
+        .query('userRepos')
+        .withSearchIndex('search_fullName', (q) =>
+          q.search('fullName', term).eq('userId', ctx.userId),
+        )
+        .paginate(paginationOpts)
+      const repos = await asyncMap(links.page, getRepoOfLink)
+      return { ...links, page: repos.filter((repo) => repo !== null) }
+    }
     return stream(ctx.db, schema)
       .query('userRepos')
-      .withIndex('by_user_fullName', (q) => q.eq('userId', ctx.userId))
-      .map((link) => ctx.db.get('repos', link.repoId))
+      .withIndex('by_user_activityAt', (q) => q.eq('userId', ctx.userId))
+      .order('desc')
+      .map(getRepoOfLink)
       .paginate(paginationOpts)
   },
 })
@@ -47,6 +67,8 @@ export const syncUserRepos = zInternalMutation({
     for (const repo of repos) {
       const repoId = await ctx.runMutation(internal.repos.upsertRepo, { repo })
       accessible.add(repoId)
+      const stored = await ctx.db.get('repos', repoId)
+      const activityAt = stored ? repoActivityAt(stored) : undefined
       const link = await ctx.db
         .query('userRepos')
         .withIndex('by_user_repo', (q) =>
@@ -58,13 +80,16 @@ export const syncUserRepos = zInternalMutation({
           userId,
           repoId,
           fullName: repo.fullName,
+          activityAt,
         })
+      else if (link.activityAt !== activityAt)
+        await ctx.db.patch('userRepos', link._id, { activityAt })
     }
 
     // Access revoked on the host: drop links, but only for providers that loaded successfully.
     const links = await ctx.db
       .query('userRepos')
-      .withIndex('by_user_fullName', (q) => q.eq('userId', userId))
+      .withIndex('by_user_activityAt', (q) => q.eq('userId', userId))
       .collect()
     await asyncMap(links, async (link) => {
       const repo = await ctx.db.get('repos', link.repoId)
@@ -85,6 +110,43 @@ export const reloadRepos = authedAction({
       providers,
       repos,
     })
+  },
+})
+
+export const reloadRepo = authedAction({
+  args: { repoId: zid('repos') },
+  handler: async (ctx, { repoId }) => {
+    const repo = await requireRepo(ctx, repoId)
+    const adapter = gitProviders[repo.provider]
+    const accessToken = await getProviderAccessToken(ctx, repo.provider)
+    const startedAt = Date.now()
+
+    for await (const branches of adapter.listBranches(accessToken, repo))
+      await ctx.runMutation(internal.branches.upsertBranches, {
+        repoId,
+        branches,
+        syncedAt: startedAt,
+      })
+    // Only reached when every page loaded, so a failed sync never prunes live branches.
+    let hasMore = true
+    while (hasMore)
+      hasMore = await ctx.runMutation(internal.branches.pruneBranches, {
+        repoId,
+        before: startedAt,
+      })
+
+    const since = await ctx.runQuery(internal.pullRequests.latestUpdatedAt, {
+      repoId,
+    })
+    for await (const pullRequests of adapter.listPullRequests(
+      accessToken,
+      repo,
+      since ?? undefined,
+    ))
+      await ctx.runMutation(internal.pullRequests.upsertPullRequests, {
+        repoId,
+        pullRequests,
+      })
   },
 })
 

@@ -1,4 +1,6 @@
+import { Link } from '@tanstack/react-router'
 import { Badge } from '#/components/ui/badge'
+import { VisibilityBadge } from '#/components/visibility-badge'
 import {
   Table,
   TableBody,
@@ -7,9 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from '#/components/ui/table'
-import type { Repo } from '#/lib/schemas/repo'
+import type { Doc } from '../../convex/_generated/dataModel'
 
-export function RepoList({ repos }: { repos: Array<Repo> }) {
+export function RepoList({ repos }: { repos: Array<Doc<'repos'>> }) {
   return (
     <Table>
       <TableHeader>
@@ -21,9 +23,15 @@ export function RepoList({ repos }: { repos: Array<Repo> }) {
       </TableHeader>
       <TableBody>
         {repos.map((repo) => (
-          <TableRow key={`${repo.provider}:${repo.externalId}`}>
+          <TableRow key={repo._id} className="relative">
             <TableCell className="whitespace-normal">
-              <div className="font-medium">{repo.fullName}</div>
+              <Link
+                to="/repos/$repoId"
+                params={{ repoId: repo._id }}
+                className="font-medium after:absolute after:inset-0"
+              >
+                {repo.fullName}
+              </Link>
               {repo.description && (
                 <div className="text-sm text-muted-foreground">
                   {repo.description}
@@ -36,9 +44,7 @@ export function RepoList({ repos }: { repos: Array<Repo> }) {
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge variant="outline">
-                {repo.private ? 'Private' : 'Public'}
-              </Badge>
+              <VisibilityBadge repo={repo} />
             </TableCell>
           </TableRow>
         ))}

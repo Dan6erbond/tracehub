@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   Book,
@@ -18,6 +19,7 @@ import {
   CollapsibleTrigger,
 } from '#/components/ui/collapsible'
 import { NavUser } from '#/components/nav-user'
+import { SearchInput } from '#/components/search-input'
 import {
   Sidebar,
   SidebarContent,
@@ -33,7 +35,8 @@ import {
 
 export function AppSidebar() {
   useInitialRepoScan()
-  const { results, status, loadMore } = useRepos()
+  const [search, setSearch] = useState('')
+  const { results, status, loadMore } = useRepos(search)
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -61,6 +64,12 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <CollapsibleContent>
               <SidebarGroupContent>
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search repositories"
+                  className="mb-2 px-2"
+                />
                 <SidebarMenu>
                   {results.map((repo) => (
                     <SidebarMenuItem key={repo._id}>
@@ -76,6 +85,11 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
+                  {status === 'Exhausted' && results.length === 0 && search && (
+                    <p className="px-2 text-sm text-muted-foreground">
+                      No matches.
+                    </p>
+                  )}
                   {(status === 'CanLoadMore' || status === 'LoadingMore') && (
                     <SidebarMenuItem>
                       <SidebarMenuButton

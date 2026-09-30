@@ -15,6 +15,9 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppMeRouteImport } from './routes/_app/me'
 import { Route as AppReposRepoIdRouteImport } from './routes/_app/repos.$repoId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AppReposRepoIdIndexRouteImport } from './routes/_app/repos.$repoId.index'
+import { Route as AppReposRepoIdBranchesSplatRouteImport } from './routes/_app/repos.$repoId.branches.$'
+import { Route as AppReposRepoIdPullsNumberRouteImport } from './routes/_app/repos.$repoId.pulls.$number'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -45,20 +48,42 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppReposRepoIdIndexRoute = AppReposRepoIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppReposRepoIdRoute,
+} as any)
+const AppReposRepoIdBranchesSplatRoute =
+  AppReposRepoIdBranchesSplatRouteImport.update({
+    id: '/branches/$',
+    path: '/branches/$',
+    getParentRoute: () => AppReposRepoIdRoute,
+  } as any)
+const AppReposRepoIdPullsNumberRoute =
+  AppReposRepoIdPullsNumberRouteImport.update({
+    id: '/pulls/$number',
+    path: '/pulls/$number',
+    getParentRoute: () => AppReposRepoIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/me': typeof AppMeRoute
-  '/repos/$repoId': typeof AppReposRepoIdRoute
+  '/repos/$repoId': typeof AppReposRepoIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/repos/$repoId/': typeof AppReposRepoIdIndexRoute
+  '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
+  '/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/me': typeof AppMeRoute
   '/': typeof AppIndexRoute
-  '/repos/$repoId': typeof AppReposRepoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/repos/$repoId': typeof AppReposRepoIdIndexRoute
+  '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
+  '/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -66,14 +91,32 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/me': typeof AppMeRoute
   '/_app/': typeof AppIndexRoute
-  '/_app/repos/$repoId': typeof AppReposRepoIdRoute
+  '/_app/repos/$repoId': typeof AppReposRepoIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/_app/repos/$repoId/': typeof AppReposRepoIdIndexRoute
+  '/_app/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
+  '/_app/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/me' | '/repos/$repoId' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/me'
+    | '/repos/$repoId'
+    | '/api/auth/$'
+    | '/repos/$repoId/'
+    | '/repos/$repoId/branches/$'
+    | '/repos/$repoId/pulls/$number'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/me' | '/' | '/repos/$repoId' | '/api/auth/$'
+  to:
+    | '/login'
+    | '/me'
+    | '/'
+    | '/api/auth/$'
+    | '/repos/$repoId'
+    | '/repos/$repoId/branches/$'
+    | '/repos/$repoId/pulls/$number'
   id:
     | '__root__'
     | '/_app'
@@ -82,6 +125,9 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/repos/$repoId'
     | '/api/auth/$'
+    | '/_app/repos/$repoId/'
+    | '/_app/repos/$repoId/branches/$'
+    | '/_app/repos/$repoId/pulls/$number'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -134,19 +180,56 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/repos/$repoId/': {
+      id: '/_app/repos/$repoId/'
+      path: '/'
+      fullPath: '/repos/$repoId/'
+      preLoaderRoute: typeof AppReposRepoIdIndexRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
+    '/_app/repos/$repoId/branches/$': {
+      id: '/_app/repos/$repoId/branches/$'
+      path: '/branches/$'
+      fullPath: '/repos/$repoId/branches/$'
+      preLoaderRoute: typeof AppReposRepoIdBranchesSplatRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
+    '/_app/repos/$repoId/pulls/$number': {
+      id: '/_app/repos/$repoId/pulls/$number'
+      path: '/pulls/$number'
+      fullPath: '/repos/$repoId/pulls/$number'
+      preLoaderRoute: typeof AppReposRepoIdPullsNumberRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
   }
 }
+
+interface AppReposRepoIdRouteChildren {
+  AppReposRepoIdIndexRoute: typeof AppReposRepoIdIndexRoute
+  AppReposRepoIdBranchesSplatRoute: typeof AppReposRepoIdBranchesSplatRoute
+  AppReposRepoIdPullsNumberRoute: typeof AppReposRepoIdPullsNumberRoute
+}
+
+const AppReposRepoIdRouteChildren: AppReposRepoIdRouteChildren = {
+  AppReposRepoIdIndexRoute: AppReposRepoIdIndexRoute,
+  AppReposRepoIdBranchesSplatRoute: AppReposRepoIdBranchesSplatRoute,
+  AppReposRepoIdPullsNumberRoute: AppReposRepoIdPullsNumberRoute,
+}
+
+const AppReposRepoIdRouteWithChildren = AppReposRepoIdRoute._addFileChildren(
+  AppReposRepoIdRouteChildren,
+)
 
 interface AppRouteChildren {
   AppMeRoute: typeof AppMeRoute
   AppIndexRoute: typeof AppIndexRoute
-  AppReposRepoIdRoute: typeof AppReposRepoIdRoute
+  AppReposRepoIdRoute: typeof AppReposRepoIdRouteWithChildren
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppMeRoute: AppMeRoute,
   AppIndexRoute: AppIndexRoute,
-  AppReposRepoIdRoute: AppReposRepoIdRoute,
+  AppReposRepoIdRoute: AppReposRepoIdRouteWithChildren,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

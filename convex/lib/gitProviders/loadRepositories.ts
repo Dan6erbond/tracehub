@@ -1,4 +1,5 @@
 import { authComponent, createAuth } from '../../auth'
+import { getProviderAccessToken } from './getAccessToken'
 import { gitProviders } from './index'
 import type { ActionCtx } from '../../_generated/server'
 import type { GitProvider, Repo } from '../../../src/lib/schemas/repo'
@@ -27,13 +28,9 @@ export async function loadRepositories(
   ).filter(([, adapter]) => linked.has(adapter.authProviderId))
 
   const results = await Promise.allSettled(
-    entries.map(async ([, adapter]) => {
-      const { accessToken } = await auth.api.getAccessToken({
-        body: { providerId: adapter.authProviderId },
-        headers,
-      })
-      return adapter.listRepositories(accessToken)
-    }),
+    entries.map(async ([provider, adapter]) =>
+      adapter.listRepositories(await getProviderAccessToken(ctx, provider)),
+    ),
   )
 
   const loaded: LoadedRepositories = { providers: [], repos: [] }

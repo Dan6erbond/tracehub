@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { RefreshCw } from 'lucide-react'
 import { InfiniteScrollTrigger } from '#/components/infinite-scroll-trigger'
 import { RepoList } from '#/components/repo-list'
+import { SearchInput } from '#/components/search-input'
 import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
 import { REPOS_PAGE_SIZE, useReloadRepos, useRepos } from '#/hooks/use-repos'
@@ -12,7 +14,8 @@ export const Route = createFileRoute('/_app/')({
 })
 
 function Home() {
-  const { results, status, loadMore } = useRepos()
+  const [search, setSearch] = useState('')
+  const { results, status, loadMore } = useRepos(search)
   const reload = useReloadRepos()
 
   return (
@@ -33,6 +36,12 @@ function Home() {
           Reload
         </Button>
       </div>
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search repositories"
+        className="max-w-sm"
+      />
       {status === 'LoadingFirstPage' && <Skeleton className="h-40 w-full" />}
       {reload.isError && (
         <p className="text-sm text-destructive">{reload.error.message}</p>
@@ -48,7 +57,11 @@ function Home() {
         </>
       )}
       {status === 'Exhausted' && results.length === 0 && (
-        <p className="text-muted-foreground">No repositories found.</p>
+        <p className="text-muted-foreground">
+          {search.trim()
+            ? 'No repositories match your search.'
+            : 'No repositories found.'}
+        </p>
       )}
     </div>
   )

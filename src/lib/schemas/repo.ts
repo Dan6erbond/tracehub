@@ -13,5 +13,6 @@ export const repoSchema = z.object({
   htmlUrl: z.string(),
   description: z.string().optional(),
   defaultBranch: z.string().optional(),
+  pushedAt: z.number().optional(),
 })
 export type Repo = z.infer<typeof repoSchema>

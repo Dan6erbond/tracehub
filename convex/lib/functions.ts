@@ -5,12 +5,19 @@ import {
   zCustomMutation,
   zCustomQuery,
 } from 'convex-helpers/server/zod4'
-import { action, internalMutation, mutation, query } from '../_generated/server'
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from '../_generated/server'
 import { triggers } from './triggers'
 import type { ActionCtx, QueryCtx } from '../_generated/server'
 
 export const zQuery = zCustomQuery(query, NoOp)
 export const zMutation = zCustomMutation(mutation, customCtx(triggers.wrapDB))
+export const zInternalQuery = zCustomQuery(internalQuery, NoOp)
 export const zInternalMutation = zCustomMutation(
   internalMutation,
   customCtx(triggers.wrapDB),
