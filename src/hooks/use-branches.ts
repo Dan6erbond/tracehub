@@ -17,7 +17,7 @@ export const useBranches = (
     { initialNumItems: BRANCHES_PAGE_SIZE },
   )
 
-/** Lists branches with the repo's default branch pinned first, honoring the open-pull-request filter. */
+/** Lists branches with the repo's default branch always pinned first, even when the open-pull-request filter would hide it. */
 export function useBranchesDefaultFirst(
   repo: Doc<'repos'>,
   openPullRequestsOnly: boolean,
@@ -31,11 +31,7 @@ export function useBranchesDefaultFirst(
         : 'skip',
     ),
   )
-  const pinned =
-    defaultBranch &&
-    (!openPullRequestsOnly || defaultBranch.pullRequests.length)
-      ? [defaultBranch]
-      : []
+  const pinned = defaultBranch ? [defaultBranch] : []
   return {
     ...rest,
     results: [
