@@ -4,5 +4,8 @@ import { convexClient } from '@convex-dev/better-auth/client/plugins'
 import type { createAuth } from '../../convex/auth'
 
 export const authClient = createAuthClient({
-  plugins: [inferAdditionalFields<ReturnType<typeof createAuth>>(), convexClient()],
+  plugins: [
+    inferAdditionalFields<ReturnType<typeof createAuth>>(),
+    convexClient(),
+  ],
 })
