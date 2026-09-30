@@ -9,7 +9,7 @@ import { Switch } from '#/components/ui/switch'
 import { UploadTracesButton } from '#/components/upload-traces-button'
 import {
   BRANCHES_PAGE_SIZE,
-  useBranches,
+  useBranchesDefaultFirst,
   useInitialRepoSync,
 } from '#/hooks/use-branches'
 import { cn } from '#/lib/utils'
@@ -18,8 +18,8 @@ import type { Doc } from '../../convex/_generated/dataModel'
 export function RepoBranchesPage({ repo }: { repo: Doc<'repos'> }) {
   const repoId = repo._id
   const [openPullRequestsOnly, setOpenPullRequestsOnly] = useState(true)
-  const { results, status, loadMore } = useBranches(
-    repoId,
+  const { results, status, loadMore } = useBranchesDefaultFirst(
+    repo,
     openPullRequestsOnly,
   )
   const reload = useInitialRepoSync(repoId)
