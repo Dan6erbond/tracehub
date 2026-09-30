@@ -18,6 +18,7 @@ import type { PullRequest } from '#/lib/schemas/pull-request'
 
 export type BranchWithPullRequests = Branch & {
   repoId: Id<'repos'>
+  remoteDeletedAt?: number
   pullRequests: Array<PullRequest>
 }
 
@@ -43,6 +44,9 @@ export function BranchCard({
             {branch.name}
           </Link>
           {isDefault && <Badge variant="secondary">default</Badge>}
+          {branch.remoteDeletedAt !== undefined && (
+            <Badge variant="outline">deleted on remote</Badge>
+          )}
         </CardTitle>
         <CardDescription>
           <CommitLink repo={repo} sha={branch.headSha} /> ·{' '}

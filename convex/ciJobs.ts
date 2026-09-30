@@ -66,7 +66,10 @@ export const headShas = zInternalQuery({
     return [
       ...new Set([
         ...branches
-          .filter(({ ciStatus }) => ciStatus !== undefined)
+          .filter(
+            ({ ciStatus, remoteDeletedAt }) =>
+              ciStatus !== undefined && remoteDeletedAt === undefined,
+          )
           .map(({ headSha }) => headSha),
         ...pullRequests.map(({ headSha }) => headSha),
       ]),

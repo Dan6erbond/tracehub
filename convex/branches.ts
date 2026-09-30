@@ -99,26 +99,69 @@ export const upsertBranches = zInternalMutation({
         internal.branches.findByName,
         { repoId, name: branch.name },
       )
+      // Replacing also clears `remoteDeletedAt`: a branch the host lists again is live again.
       await replaceOrInsert(ctx, 'branches', existing, {
         repoId,
         ...branch,
         syncedAt,
+        createdBy: existing?.createdBy,
       })
     }
   },
 })
 
-/** Deletes branches the host no longer lists (not touched since `before`); returns whether more remain. */
+/** The branch an upload runs on, created when no sync has reported it yet; the next sync replaces it, keeping the id. */
+export const ensureBranch = zInternalMutation({
+  args: {
+    repoId: zid('repos'),
+    name: z.string(),
+    headSha: z.string(),
+    createdBy: z.string(),
+  },
+  handler: async (ctx, { repoId, name, headSha, createdBy }) => {
+    const existing: Doc<'branches'> | null = await ctx.runQuery(
+      internal.branches.findByName,
+      { repoId, name },
+    )
+    if (!existing)
+      await ctx.db.insert('branches', {
+        repoId,
+        name,
+        headSha,
+        committedAt: Date.now(),
+        createdBy,
+      })
+  },
+})
+
+/**
+ * Handles branches the host no longer lists (synced, but not touched since `before`): deletes those without runs,
+ * marks the rest as deleted on the remote. Returns whether more remain.
+ */
 export const pruneBranches = zInternalMutation({
   args: { repoId: zid('repos'), before: z.number() },
   handler: async (ctx, { repoId, before }) => {
     const stale = await ctx.db
       .query('branches')
-      .withIndex('by_repo_syncedAt', (q) =>
-        q.eq('repoId', repoId).lt('syncedAt', before),
+      .withIndex('by_repo_remoteDeletedAt_syncedAt', (q) =>
+        q
+          .eq('repoId', repoId)
+          .eq('remoteDeletedAt', undefined)
+          .gt('syncedAt', undefined)
+          .lt('syncedAt', before),
       )
       .take(PRUNE_BATCH_SIZE)
-    for (const branch of stale) await ctx.db.delete('branches', branch._id)
+    for (const branch of stale) {
+      const hasRuns: boolean = await ctx.runQuery(
+        internal.runs.existsOnBranch,
+        { repoId, branch: branch.name },
+      )
+      if (hasRuns)
+        await ctx.db.patch('branches', branch._id, {
+          remoteDeletedAt: Date.now(),
+        })
+      else await ctx.db.delete('branches', branch._id)
+    }
     return stale.length === PRUNE_BATCH_SIZE
   },
 })

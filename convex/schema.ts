@@ -31,11 +31,20 @@ export default defineSchema({
   branches: defineTable({
     repoId: v.id('repos'),
     ...zodToConvexFields(branchSchema.shape),
-    syncedAt: v.number(),
+    // Last seen on the host; absent on branches created from an upload until a sync reports them.
+    syncedAt: v.optional(v.number()),
+    // Set when the host stopped listing a branch that runs still reference; the branch stays until they are gone.
+    remoteDeletedAt: v.optional(v.number()),
+    // The user who uploaded to the branch first; absent on branches created by a sync.
+    createdBy: v.optional(v.string()),
   })
     .index('by_repo_name', ['repoId', 'name'])
     .index('by_repo_committedAt', ['repoId', 'committedAt'])
-    .index('by_repo_syncedAt', ['repoId', 'syncedAt']),
+    .index('by_repo_remoteDeletedAt_syncedAt', [
+      'repoId',
+      'remoteDeletedAt',
+      'syncedAt',
+    ]),
   pullRequests: defineTable({
     repoId: v.id('repos'),
     ...zodToConvexFields(pullRequestSchema.shape),

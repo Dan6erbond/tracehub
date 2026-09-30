@@ -81,6 +81,17 @@ export const listForPipeline = zInternalQuery({
       .collect(),
 })
 
+export const existsOnBranch = zInternalQuery({
+  args: { repoId: zid('repos'), branch: z.string() },
+  handler: async (ctx, { repoId, branch }) =>
+    (await ctx.db
+      .query('runs')
+      .withIndex('by_repo_branch', (q) =>
+        q.eq('repoId', repoId).eq('branch', branch),
+      )
+      .first()) !== null,
+})
+
 export const listForJob = zInternalQuery({
   args: { jobId: zid('ciJobs') },
   handler: (ctx, { jobId }) =>
@@ -233,6 +244,13 @@ export const getOrCreateRun = zInternalMutation({
     { repoId, createdBy, run, pinned },
   ): Promise<Id<'runs'>> => {
     const { externalRunId, externalJobId, jobName, ciUrl, ...fields } = run
+    if (run.branch !== undefined)
+      await ctx.runMutation(internal.branches.ensureBranch, {
+        repoId,
+        name: run.branch,
+        headSha: run.sha,
+        createdBy,
+      })
     const {
       pipelineId,
       jobId,
