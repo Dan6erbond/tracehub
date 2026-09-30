@@ -1,5 +1,6 @@
 import { defineApp } from 'convex/server'
 import { v } from 'convex/values'
+import aggregate from '@convex-dev/aggregate/convex.config.js'
 import migrations from '@convex-dev/migrations/convex.config.js'
 import betterAuth from './betterAuth/convex.config'
 
@@ -13,5 +14,8 @@ const app = defineApp({
 })
 app.use(betterAuth)
 app.use(migrations)
+app.use(aggregate, { name: 'tracesByRun' })
+app.use(aggregate, { name: 'tracesByBranch' })
+app.use(aggregate, { name: 'tracesByPull' })
 
 export default app

@@ -1,6 +1,7 @@
 import { asyncMap } from 'convex-helpers'
 import { Triggers } from 'convex-helpers/server/triggers'
 import { repoActivityAt } from './repoActivity'
+import { tracesByBranch, tracesByPull, tracesByRun } from './traceAggregates'
 import type { DataModel } from '../_generated/dataModel'
 
 export const triggers = new Triggers<DataModel>()
@@ -22,4 +23,15 @@ triggers.register('repos', async (ctx, change) => {
   await asyncMap(links, (link) =>
     ctx.db.patch('userRepos', link._id, { fullName, activityAt }),
   )
+})
+
+triggers.register('traces', tracesByRun.trigger())
+
+// Traces without a branch or pull request are not part of those aggregates, so the counts never mix them in under a placeholder key.
+const branchTrigger = tracesByBranch.trigger()
+const pullTrigger = tracesByPull.trigger()
+triggers.register('traces', async (ctx, change) => {
+  const trace = change.newDoc ?? change.oldDoc
+  if (trace.branch !== undefined) await branchTrigger(ctx, change)
+  if (trace.prNumber !== undefined) await pullTrigger(ctx, change)
 })

@@ -4,6 +4,8 @@ import { zodToConvexFields } from 'convex-helpers/server/zod4'
 import { branchSchema } from '../src/lib/schemas/branch'
 import { pullRequestSchema } from '../src/lib/schemas/pull-request'
 import { repoSchema } from '../src/lib/schemas/repo'
+import { runSchema } from '../src/lib/schemas/run'
+import { traceSchema } from '../src/lib/schemas/trace'
 
 export default defineSchema({
   repos: defineTable(zodToConvexFields(repoSchema.shape)).index(
@@ -39,4 +41,20 @@ export default defineSchema({
     .index('by_repo_number', ['repoId', 'number'])
     .index('by_repo_updatedAt', ['repoId', 'updatedAt'])
     .index('by_repo_head', ['repoId', 'fromFork', 'headBranch', 'state']),
+  runs: defineTable({
+    repoId: v.id('repos'),
+    ...zodToConvexFields(runSchema.shape),
+    createdBy: v.string(),
+  })
+    .index('by_repo_identity', ['repoId', 'sha', 'externalRunId'])
+    .index('by_repo_branch', ['repoId', 'branch', 'pinnedAt'])
+    .index('by_repo_pr', ['repoId', 'prNumber', 'pinnedAt']),
+  traces: defineTable({
+    repoId: v.id('repos'),
+    runId: v.id('runs'),
+    // copied from the run so aggregates can be keyed by them; a run's identity never changes
+    branch: v.optional(v.string()),
+    prNumber: v.optional(v.number()),
+    ...zodToConvexFields(traceSchema.shape),
+  }).index('by_run', ['runId']),
 })
