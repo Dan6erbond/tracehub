@@ -28,8 +28,9 @@ Drone CI-style app for Playwright traces. Users sign in with their Git host (Git
 The trace is the atom. Everything else is metadata supplied at upload time or grouping derived from it.
 
 - **Trace**: the uploaded zip plus test title, status, and duration. Belongs to a run.
-- **Run**: a group of traces from one upload session, not necessarily a CI job. Identified by repo + commit SHA + optional `externalRunId` (e.g. Drone build number, GitHub run id, Woodpecker pipeline). CI agents pass `externalRunId` and `ciUrl`; the server upserts the run on first upload and reuses it after. Without an `externalRunId` (local agent, no CI) the server creates a run per upload batch.
-- **Upload params**: `repo` (host + full name) and `sha` are required. `branch`, `prNumber`, `externalRunId`, `ciUrl`, and `jobName` are optional. A non-CI agent only needs `repo`, `sha`, and `prNumber` or `branch`.
+- **Run**: a group of traces from one upload session, not necessarily a CI job. Identified by repo + commit SHA + optional `externalRunId` (the pipeline: Drone build number, GitHub run id, Woodpecker pipeline) + optional `externalJobId` (the job within it). CI agents pass `externalRunId`, `externalJobId`, `jobName` and `ciUrl`; the server upserts the run on first upload and reuses it after. Without either id (local agent, no CI) the server creates a run per upload batch.
+- **CI job**: a job or commit status of a commit as the Git host reports it, synced with the repo (heads of recent branches with CI and of open PRs). Keyed by repo + SHA + the host's job id (`externalId`). A run links to its job by `externalJobId`, falling back to `jobName` within the same pipeline; traces never reference jobs directly.
+- **Upload params**: `repo` (host + full name) and `sha` are required. `branch`, `prNumber`, `externalRunId`, `externalJobId`, `jobName`, and `ciUrl` are optional. A non-CI agent only needs `repo`, `sha`, and `prNumber` or `branch`.
 - **PR association**: an explicit `prNumber` wins. Otherwise the branch is matched to its open PR through the Git host API when viewing. Store `prNumber` on the run when given; never make it a required field.
 - **Repo access**: authorization always goes through the host's permissions. API keys are scoped to the user who created them and only accept uploads to repos that user can access.
 
