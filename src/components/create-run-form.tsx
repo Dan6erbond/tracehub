@@ -79,9 +79,20 @@ export function CreateRunForm({
                   {(field) => (
                     <field.TextField
                       label="Pipeline run ID"
-                      description="Uploads with the same ID and commit share one run"
+                      description="Uploads with the same pipeline, job and commit share one run"
                     />
                   )}
+                </form.AppField>
+                <form.AppField name="externalJobId">
+                  {(field) => (
+                    <field.TextField
+                      label="Job ID"
+                      description="Links the run to that job of the Git host's CI"
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="jobName">
+                  {(field) => <field.TextField label="Job name" />}
                 </form.AppField>
                 <form.AppField name="ciUrl">
                   {(field) => <field.TextField label="Pipeline URL" />}

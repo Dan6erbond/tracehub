@@ -19,7 +19,7 @@ import type { TraceCounts } from '../src/lib/schemas/trace'
 
 export type RunWithCounts = Doc<'runs'> & { traceCounts: TraceCounts }
 
-const withTraceCounts = async (
+export const withTraceCounts = async (
   ctx: QueryCtx,
   run: Doc<'runs'>,
 ): Promise<RunWithCounts> => {
@@ -38,14 +38,33 @@ export const findInRepo = zInternalQuery({
   },
 })
 
+export const listForSha = zInternalQuery({
+  args: { repoId: zid('repos'), sha: z.string() },
+  handler: (ctx, { repoId, sha }) =>
+    ctx.db
+      .query('runs')
+      .withIndex('by_repo_identity', (q) =>
+        q.eq('repoId', repoId).eq('sha', sha),
+      )
+      .collect(),
+})
+
 export const getRun = repoQuery({
   args: { runId: zid('runs') },
-  handler: async (ctx, { repoId, runId }): Promise<RunWithCounts | null> => {
+  handler: async (
+    ctx,
+    { repoId, runId },
+  ): Promise<(RunWithCounts & { job: Doc<'ciJobs'> | null }) | null> => {
     const run: Doc<'runs'> | null = await ctx.runQuery(
       internal.runs.findInRepo,
       { repoId, runId },
     )
-    return run && withTraceCounts(ctx, run)
+    if (!run) return null
+    const job: Doc<'ciJobs'> | null = await ctx.runQuery(
+      internal.ciJobs.findForRun,
+      { repoId, runId },
+    )
+    return { ...(await withTraceCounts(ctx, run)), job }
   },
 })
 
@@ -123,14 +142,15 @@ export const getOrCreateRun = zInternalMutation({
     pinned: z.boolean(),
   },
   handler: async (ctx, { repoId, createdBy, run, pinned }) => {
-    if (run.externalRunId !== undefined) {
+    if (run.externalRunId !== undefined || run.externalJobId !== undefined) {
       const existing = await ctx.db
         .query('runs')
         .withIndex('by_repo_identity', (q) =>
           q
             .eq('repoId', repoId)
             .eq('sha', run.sha)
-            .eq('externalRunId', run.externalRunId),
+            .eq('externalRunId', run.externalRunId)
+            .eq('externalJobId', run.externalJobId),
         )
         .unique()
       if (existing) return existing._id

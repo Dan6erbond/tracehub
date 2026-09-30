@@ -11,6 +11,7 @@ import {
   zInternalMutation,
   zInternalQuery,
 } from './lib/functions'
+import { chunk } from './lib/chunk'
 import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
 import { gitProviders } from './lib/gitProviders'
 import { loadRepositories } from './lib/gitProviders/loadRepositories'
@@ -18,6 +19,8 @@ import { repoActivityAt } from './lib/repoActivity'
 import type { Doc } from './_generated/dataModel'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { gitProviderSchema, repoSchema } from '../src/lib/schemas/repo'
+
+const PRUNE_JOBS_SHA_BATCH_SIZE = 25
 
 export const listRepos = authedQuery({
   args: { search: z.string().optional(), paginationOpts: paginationOptsSchema },
@@ -150,6 +153,22 @@ export const reloadRepo = repoAction({
       await ctx.runMutation(internal.pullRequests.upsertPullRequests, {
         repoId,
         pullRequests,
+      })
+
+    const shas: Array<string> = await ctx.runQuery(internal.ciJobs.headShas, {
+      repoId,
+    })
+    for await (const jobs of adapter.listJobs(accessToken, ctx.repo, shas))
+      await ctx.runMutation(internal.ciJobs.upsertJobs, {
+        repoId,
+        jobs,
+        syncedAt: startedAt,
+      })
+    for (const batch of chunk(shas, PRUNE_JOBS_SHA_BATCH_SIZE))
+      await ctx.runMutation(internal.ciJobs.pruneJobs, {
+        repoId,
+        shas: batch,
+        before: startedAt,
       })
   },
 })

@@ -6,6 +6,8 @@ export const runSchema = z.object({
   branch: z.string().trim().min(1).optional(),
   prNumber: z.number().int().positive().optional(),
   externalRunId: z.string().trim().min(1).optional(),
+  externalJobId: z.string().trim().min(1).optional(),
+  jobName: z.string().trim().min(1).optional(),
   ciUrl: z.url().optional(),
   title: z.string().trim().min(1).optional(),
   description: z.string().trim().min(1).optional(),

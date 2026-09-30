@@ -4,6 +4,7 @@ import { convexQuery } from '@convex-dev/react-query'
 import { ChevronLeft, MoveRight } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
 import { BranchBadge } from '#/components/branch-badge'
+import { CiJobList } from '#/components/ci-job-list'
 import { CommitLink } from '#/components/commit-link'
 import { PullRequestBadge } from '#/components/pull-request-badge'
 import { RunList } from '#/components/run-list'
@@ -60,6 +61,9 @@ export function PullRequestPage({
             <CommitLink repo={repo} sha={pullRequest.data.headSha} />
           </div>
         </div>
+      )}
+      {pullRequest.data && (
+        <CiJobList repoId={repoId} sha={pullRequest.data.headSha} />
       )}
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold">Trace runs</h3>

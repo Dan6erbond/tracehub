@@ -15,7 +15,6 @@ export const traceSchema = z.object({
   title: z.string().trim().min(1),
   status: traceStatusSchema,
   durationMs: z.number().nonnegative().optional(),
-  jobName: z.string().trim().min(1).optional(),
   fileName: z.string(),
   size: z.number().nonnegative(),
   storageId: zid('_storage'),

@@ -7,6 +7,8 @@ const defaultValues: CreateRunFormValues = {
   description: '',
   sha: '',
   externalRunId: '',
+  externalJobId: '',
+  jobName: '',
   ciUrl: '',
   pinned: false,
   traces: [],

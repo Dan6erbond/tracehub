@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { ChevronLeft } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
+import { CiJobList } from '#/components/ci-job-list'
 import { CiStatusBadge } from '#/components/ci-status-badge'
 import { CommitLink } from '#/components/commit-link'
 import { HostBadge } from '#/components/host-badge'
@@ -68,6 +69,7 @@ export function BranchPage({
           )}
         </div>
       )}
+      {branch.data && <CiJobList repoId={repoId} sha={branch.data.headSha} />}
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold">Trace runs</h3>
         <UploadTracesButton repoId={repoId} target={{ branch: name }} />

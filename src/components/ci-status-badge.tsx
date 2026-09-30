@@ -1,6 +1,6 @@
 import { CircleCheck, CircleX, LoaderCircle } from 'lucide-react'
 import { Badge } from '#/components/ui/badge'
-import type { CiStatus } from '#/lib/schemas/branch'
+import type { CiStatus } from '#/lib/schemas/ci-status'
 
 const CI_STATUS_DISPLAY = {
   success: {

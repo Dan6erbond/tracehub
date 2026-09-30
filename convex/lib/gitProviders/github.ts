@@ -1,5 +1,8 @@
 import { Octokit } from '@octokit/rest'
-import type { Branch, CiStatus } from '../../../src/lib/schemas/branch'
+import { chunk } from '../chunk'
+import type { Branch } from '../../../src/lib/schemas/branch'
+import type { CiJob } from '../../../src/lib/schemas/ci-job'
+import type { CiStatus } from '../../../src/lib/schemas/ci-status'
 import type {
   PullRequest,
   PullRequestState,
@@ -65,6 +68,39 @@ const PULL_REQUESTS_QUERY = `
   }
 `
 
+const COMMIT_JOBS_QUERY = `
+  query ($owner: String!, $name: String!, $oid: GitObjectID!, $after: String) {
+    repository(owner: $owner, name: $name) {
+      object(oid: $oid) {
+        ... on Commit {
+          statusCheckRollup {
+            contexts(first: 100, after: $after) {
+              pageInfo { hasNextPage endCursor }
+              nodes {
+                __typename
+                ... on CheckRun {
+                  databaseId
+                  name
+                  status
+                  conclusion
+                  detailsUrl
+                  startedAt
+                  completedAt
+                  checkSuite { workflowRun { databaseId event } }
+                }
+                ... on StatusContext { context state targetUrl }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+// Commits are fetched this many at a time, well below GitHub's concurrent request limit.
+const JOBS_CONCURRENCY = 10
+
 type RollupState = 'SUCCESS' | 'FAILURE' | 'ERROR' | 'PENDING' | 'EXPECTED'
 
 const CI_STATUS: Record<RollupState, CiStatus> = {
@@ -87,6 +123,69 @@ interface BranchNode {
     oid?: string
     committedDate?: string
     statusCheckRollup?: { state: RollupState } | null
+  }
+}
+
+interface CheckRunNode {
+  __typename: 'CheckRun'
+  databaseId: number
+  name: string
+  status: string
+  conclusion: string | null
+  detailsUrl: string | null
+  startedAt: string | null
+  completedAt: string | null
+  checkSuite: { workflowRun: { databaseId: number; event: string } | null }
+}
+
+interface StatusContextNode {
+  __typename: 'StatusContext'
+  context: string
+  state: RollupState
+  targetUrl: string | null
+}
+
+type JobContextNode = CheckRunNode | StatusContextNode
+
+interface CommitJobsResponse {
+  repository: {
+    object: {
+      statusCheckRollup?: { contexts: Connection<JobContextNode> } | null
+    } | null
+  }
+}
+
+const NO_CONTEXTS: Connection<JobContextNode> = {
+  nodes: [],
+  pageInfo: { hasNextPage: false, endCursor: null },
+}
+
+const PASSING_CONCLUSIONS = new Set(['SUCCESS', 'NEUTRAL', 'SKIPPED'])
+
+const toTime = (value: string | null) => (value ? Date.parse(value) : undefined)
+
+const toJob = (sha: string, node: JobContextNode): CiJob => {
+  if (node.__typename === 'StatusContext')
+    return {
+      sha,
+      externalId: node.context,
+      name: node.context,
+      status: CI_STATUS[node.state],
+      url: node.targetUrl ?? undefined,
+    }
+  const { workflowRun } = node.checkSuite
+  const passed = PASSING_CONCLUSIONS.has(node.conclusion ?? '')
+  return {
+    sha,
+    externalId: String(node.databaseId),
+    name: node.name,
+    status:
+      node.status !== 'COMPLETED' ? 'pending' : passed ? 'success' : 'failure',
+    pipeline: workflowRun ? String(workflowRun.databaseId) : undefined,
+    trigger: workflowRun?.event,
+    url: node.detailsUrl ?? undefined,
+    startedAt: toTime(node.startedAt),
+    completedAt: toTime(node.completedAt),
   }
 }
 
@@ -177,5 +276,23 @@ export const githubAdapter: GitProviderAdapter = {
       if (fresh.length > 0) yield fresh
       if (fresh.length < pullRequests.length) return
     }
+  },
+  listJobs: async function* (accessToken, { owner, name }, shas) {
+    const octokit = new Octokit({ auth: accessToken })
+    const listCommitJobs = async (sha: string) => {
+      const pages = paginate<JobContextNode>(async (after) => {
+        const { repository } = await octokit.graphql<CommitJobsResponse>(
+          COMMIT_JOBS_QUERY,
+          { owner, name, oid: sha, after },
+        )
+        return repository.object?.statusCheckRollup?.contexts ?? NO_CONTEXTS
+      })
+      const jobs: Array<CiJob> = []
+      for await (const nodes of pages)
+        jobs.push(...nodes.map((node) => toJob(sha, node)))
+      return jobs
+    }
+    for (const batch of chunk(shas, JOBS_CONCURRENCY))
+      yield (await Promise.all(batch.map(listCommitJobs))).flat()
   },
 }

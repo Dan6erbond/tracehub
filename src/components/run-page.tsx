@@ -6,6 +6,7 @@ import {
   Pin,
   PinOff,
 } from 'lucide-react'
+import { CiStatusBadge } from '#/components/ci-status-badge'
 import { CommitLink } from '#/components/commit-link'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
 import { TraceTable } from '#/components/trace-table'
@@ -65,6 +66,13 @@ export function RunPage({
                 <CommitLink repo={repo} sha={run.data.sha} /> ·{' '}
                 {new Date(run.data._creationTime).toLocaleString()}
               </p>
+              {run.data.job && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">CI job</span>
+                  <span>{run.data.job.name}</span>
+                  <CiStatusBadge status={run.data.job.status} />
+                </div>
+              )}
               {run.data.description && <p>{run.data.description}</p>}
               <TraceCountsBadges counts={run.data.traceCounts} />
             </div>

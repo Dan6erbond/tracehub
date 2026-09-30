@@ -28,7 +28,6 @@ export const TraceUploadList = withForm({
                   file,
                   title: file.name.replace(/\.zip$/i, ''),
                   status: 'unknown',
-                  jobName: '',
                 })
                 parseTraceZip(file)
                   .then(({ title, durationMs, status }) =>

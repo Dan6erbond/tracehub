@@ -1,4 +1,5 @@
 import type { Branch } from '../../../src/lib/schemas/branch'
+import type { CiJob } from '../../../src/lib/schemas/ci-job'
 import type { PullRequest } from '../../../src/lib/schemas/pull-request'
 import type { GitProvider, Repo } from '../../../src/lib/schemas/repo'
 
@@ -19,6 +20,12 @@ export interface GitProviderAdapter {
     repo: RepoRef,
     since?: number,
   ) => AsyncIterable<Array<PullRequest>>
+  /** Yields the CI jobs (check runs and commit statuses) of the given commits in bounded batches. */
+  listJobs: (
+    accessToken: string,
+    repo: RepoRef,
+    shas: Array<string>,
+  ) => AsyncIterable<Array<CiJob>>
 }
 
 export type GitProviderRegistry = Record<GitProvider, GitProviderAdapter>

@@ -27,7 +27,6 @@ export function useSubmitTraces(repoId: Id<'repos'>, target: TraceTarget) {
           title: item.title,
           status: item.status,
           durationMs: item.durationMs,
-          jobName: emptyToUndefined(item.jobName),
           fileName: item.file.name,
           size: item.file.size,
           storageId: await uploadFile(
@@ -50,6 +49,8 @@ export function useSubmitTraces(repoId: Id<'repos'>, target: TraceTarget) {
         title: emptyToUndefined(run.title),
         description: emptyToUndefined(run.description),
         externalRunId: emptyToUndefined(run.externalRunId),
+        externalJobId: emptyToUndefined(run.externalJobId),
+        jobName: emptyToUndefined(run.jobName),
         ciUrl: emptyToUndefined(run.ciUrl),
         branch: target.kind === 'branch' ? target.branch : undefined,
         prNumber: target.kind === 'pull' ? target.number : undefined,
