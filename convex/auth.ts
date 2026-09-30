@@ -23,6 +23,8 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
       github: {
         clientId: env.GITHUB_CLIENT_ID,
         clientSecret: env.GITHUB_CLIENT_SECRET,
+        // `repo` is needed to list private repositories
+        scope: ['repo'],
       },
     },
     user: {

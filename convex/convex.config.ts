@@ -1,5 +1,6 @@
 import { defineApp } from 'convex/server'
 import { v } from 'convex/values'
+import migrations from '@convex-dev/migrations/convex.config.js'
 import betterAuth from './betterAuth/convex.config'
 
 const app = defineApp({
@@ -11,5 +12,6 @@ const app = defineApp({
   },
 })
 app.use(betterAuth)
+app.use(migrations)
 
 export default app

@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppMeRouteImport } from './routes/_app/me'
+import { Route as AppReposRepoIdRouteImport } from './routes/_app/repos.$repoId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const AppRoute = AppRouteImport.update({
@@ -34,6 +35,11 @@ const AppMeRoute = AppMeRouteImport.update({
   path: '/me',
   getParentRoute: () => AppRoute,
 } as any)
+const AppReposRepoIdRoute = AppReposRepoIdRouteImport.update({
+  id: '/repos/$repoId',
+  path: '/repos/$repoId',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -44,12 +50,14 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/me': typeof AppMeRoute
+  '/repos/$repoId': typeof AppReposRepoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/me': typeof AppMeRoute
   '/': typeof AppIndexRoute
+  '/repos/$repoId': typeof AppReposRepoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -58,14 +66,22 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/me': typeof AppMeRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/repos/$repoId': typeof AppReposRepoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/me' | '/api/auth/$'
+  fullPaths: '/' | '/login' | '/me' | '/repos/$repoId' | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/me' | '/' | '/api/auth/$'
-  id: '__root__' | '/_app' | '/login' | '/_app/me' | '/_app/' | '/api/auth/$'
+  to: '/login' | '/me' | '/' | '/repos/$repoId' | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/login'
+    | '/_app/me'
+    | '/_app/'
+    | '/_app/repos/$repoId'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -104,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMeRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/repos/$repoId': {
+      id: '/_app/repos/$repoId'
+      path: '/repos/$repoId'
+      fullPath: '/repos/$repoId'
+      preLoaderRoute: typeof AppReposRepoIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -117,11 +140,13 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppMeRoute: typeof AppMeRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppReposRepoIdRoute: typeof AppReposRepoIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppMeRoute: AppMeRoute,
   AppIndexRoute: AppIndexRoute,
+  AppReposRepoIdRoute: AppReposRepoIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
