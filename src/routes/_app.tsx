@@ -1,4 +1,11 @@
-import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import {
+  Outlet,
+  createFileRoute,
+  redirect,
+  useNavigate,
+} from '@tanstack/react-router'
+import { useConvexAuth } from 'convex/react'
 import { AppSidebar } from '#/components/app-sidebar'
 import { Separator } from '#/components/ui/separator'
 import {
@@ -14,7 +21,19 @@ export const Route = createFileRoute('/_app')({
   component: AppLayout,
 })
 
+// beforeLoad only checks the server-side session. Convex authenticates the
+// websocket separately and asynchronously (and drops auth on sign-out or token
+// expiry), so children must not mount queries until Convex itself is authed.
 function AppLayout() {
+  const { isLoading, isAuthenticated } = useConvexAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) void navigate({ to: '/login' })
+  }, [isLoading, isAuthenticated, navigate])
+
+  if (!isAuthenticated) return null
+
   return (
     <SidebarProvider>
       <AppSidebar />
