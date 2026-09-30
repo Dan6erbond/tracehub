@@ -2,10 +2,9 @@ import { z } from 'zod'
 import { asyncMap } from 'convex-helpers'
 import { stream } from 'convex-helpers/server/stream'
 import { zid } from 'convex-helpers/server/zod4'
+import { internal } from './_generated/api'
 import schema from './schema'
-import { authedQuery, zInternalMutation } from './lib/functions'
-import { requireRepo } from './lib/requireRepo'
-import { getOpenPullRequestsForBranch } from './pullRequests'
+import { repoQuery, zInternalMutation } from './lib/functions'
 import { branchSchema } from '../src/lib/schemas/branch'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import type { Doc } from './_generated/dataModel'
@@ -16,22 +15,17 @@ const PRUNE_BATCH_SIZE = 500
 // Each scanned branch costs a pull request lookup; the cap keeps a sparse filter under Convex's per-function query limit.
 const MAX_BRANCHES_SCANNED_PER_PAGE = 500
 
-const withOpenPullRequests = async (
-  ctx: QueryCtx,
-  branch: Doc<'branches'>,
-) => ({
-  ...branch,
-  pullRequests: await getOpenPullRequestsForBranch(
-    ctx,
-    branch.repoId,
-    branch.name,
-  ),
-})
+const withOpenPullRequests = async (ctx: QueryCtx, branch: Doc<'branches'>) => {
+  const pullRequests: Array<Doc<'pullRequests'>> = await ctx.runQuery(
+    internal.pullRequests.listOpenForBranch,
+    { repoId: branch.repoId, branchName: branch.name },
+  )
+  return { ...branch, pullRequests }
+}
 
-export const getBranch = authedQuery({
-  args: { repoId: zid('repos'), name: z.string() },
+export const getBranch = repoQuery({
+  args: { name: z.string() },
   handler: async (ctx, { repoId, name }) => {
-    await requireRepo(ctx, repoId)
     const branch = await ctx.db
       .query('branches')
       .withIndex('by_repo_name', (q) => q.eq('repoId', repoId).eq('name', name))
@@ -40,15 +34,13 @@ export const getBranch = authedQuery({
   },
 })
 
-export const listBranches = authedQuery({
+export const listBranches = repoQuery({
   args: {
-    repoId: zid('repos'),
     openPullRequestsOnly: z.boolean(),
     paginationOpts: paginationOptsSchema,
   },
-  handler: async (ctx, { repoId, openPullRequestsOnly, paginationOpts }) => {
-    await requireRepo(ctx, repoId)
-    return stream(ctx.db, schema)
+  handler: (ctx, { repoId, openPullRequestsOnly, paginationOpts }) =>
+    stream(ctx.db, schema)
       .query('branches')
       .withIndex('by_repo_committedAt', (q) => q.eq('repoId', repoId))
       .order('desc')
@@ -61,8 +53,7 @@ export const listBranches = authedQuery({
       .paginate({
         ...paginationOpts,
         maximumRowsRead: MAX_BRANCHES_SCANNED_PER_PAGE,
-      })
-  },
+      }),
 })
 
 export const upsertBranches = zInternalMutation({

@@ -4,12 +4,17 @@ import { stream } from 'convex-helpers/server/stream'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
 import schema from './schema'
-import { authedAction, authedQuery, zInternalMutation } from './lib/functions'
+import {
+  authedAction,
+  authedQuery,
+  repoAction,
+  zInternalMutation,
+  zInternalQuery,
+} from './lib/functions'
 import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
 import { gitProviders } from './lib/gitProviders'
 import { loadRepositories } from './lib/gitProviders/loadRepositories'
 import { repoActivityAt } from './lib/repoActivity'
-import { requireRepo } from './lib/requireRepo'
 import type { Doc } from './_generated/dataModel'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { gitProviderSchema, repoSchema } from '../src/lib/schemas/repo'
@@ -113,15 +118,14 @@ export const reloadRepos = authedAction({
   },
 })
 
-export const reloadRepo = authedAction({
-  args: { repoId: zid('repos') },
+export const reloadRepo = repoAction({
+  args: {},
   handler: async (ctx, { repoId }) => {
-    const repo = await requireRepo(ctx, repoId)
-    const adapter = gitProviders[repo.provider]
-    const accessToken = await getProviderAccessToken(ctx, repo.provider)
+    const adapter = gitProviders[ctx.repo.provider]
+    const accessToken = await getProviderAccessToken(ctx, ctx.repo.provider)
     const startedAt = Date.now()
 
-    for await (const branches of adapter.listBranches(accessToken, repo))
+    for await (const branches of adapter.listBranches(accessToken, ctx.repo))
       await ctx.runMutation(internal.branches.upsertBranches, {
         repoId,
         branches,
@@ -140,7 +144,7 @@ export const reloadRepo = authedAction({
     })
     for await (const pullRequests of adapter.listPullRequests(
       accessToken,
-      repo,
+      ctx.repo,
       since ?? undefined,
     ))
       await ctx.runMutation(internal.pullRequests.upsertPullRequests, {
@@ -150,15 +154,21 @@ export const reloadRepo = authedAction({
   },
 })
 
-export const getRepo = authedQuery({
-  args: { repoId: zid('repos') },
-  handler: async (ctx, { repoId }) => {
+export const getUserRepo = zInternalQuery({
+  args: { userId: z.string(), repoId: zid('repos') },
+  handler: async (ctx, { userId, repoId }) => {
     const link = await ctx.db
       .query('userRepos')
       .withIndex('by_user_repo', (q) =>
-        q.eq('userId', ctx.userId).eq('repoId', repoId),
+        q.eq('userId', userId).eq('repoId', repoId),
       )
       .unique()
     return link ? ctx.db.get('repos', repoId) : null
   },
+})
+
+export const getRepo = authedQuery({
+  args: { repoId: zid('repos') },
+  handler: (ctx, { repoId }): Promise<Doc<'repos'> | null> =>
+    ctx.runQuery(internal.repos.getUserRepo, { userId: ctx.userId, repoId }),
 })

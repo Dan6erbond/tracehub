@@ -1,39 +1,41 @@
 import { z } from 'zod'
 import { asyncMap } from 'convex-helpers'
 import { zid } from 'convex-helpers/server/zod4'
-import { authedQuery, zInternalMutation, zInternalQuery } from './lib/functions'
-import { requireRepo } from './lib/requireRepo'
+import { internal } from './_generated/api'
+import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
 import { pullRequestSchema } from '../src/lib/schemas/pull-request'
-import type { Id } from './_generated/dataModel'
-import type { QueryCtx } from './_generated/server'
+import type { Doc } from './_generated/dataModel'
 
-export const getOpenPullRequestsForBranch = (
-  ctx: QueryCtx,
-  repoId: Id<'repos'>,
-  branchName: string,
-) =>
-  ctx.db
-    .query('pullRequests')
-    .withIndex('by_repo_head', (q) =>
-      q
-        .eq('repoId', repoId)
-        .eq('fromFork', false)
-        .eq('headBranch', branchName)
-        .eq('state', 'open'),
-    )
-    .collect()
+export const listOpenForBranch = zInternalQuery({
+  args: { repoId: zid('repos'), branchName: z.string() },
+  handler: (ctx, { repoId, branchName }) =>
+    ctx.db
+      .query('pullRequests')
+      .withIndex('by_repo_head', (q) =>
+        q
+          .eq('repoId', repoId)
+          .eq('fromFork', false)
+          .eq('headBranch', branchName)
+          .eq('state', 'open'),
+      )
+      .collect(),
+})
 
-export const getPullRequest = authedQuery({
+export const getByNumber = zInternalQuery({
   args: { repoId: zid('repos'), number: z.number() },
-  handler: async (ctx, { repoId, number }) => {
-    await requireRepo(ctx, repoId)
-    return ctx.db
+  handler: (ctx, { repoId, number }) =>
+    ctx.db
       .query('pullRequests')
       .withIndex('by_repo_number', (q) =>
         q.eq('repoId', repoId).eq('number', number),
       )
-      .unique()
-  },
+      .unique(),
+})
+
+export const getPullRequest = repoQuery({
+  args: { number: z.number() },
+  handler: (ctx, { repoId, number }): Promise<Doc<'pullRequests'> | null> =>
+    ctx.runQuery(internal.pullRequests.getByNumber, { repoId, number }),
 })
 
 export const latestUpdatedAt = zInternalQuery({
