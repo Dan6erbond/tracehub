@@ -1,18 +1,14 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
-import BetterAuthHeader from '#/integrations/better-auth/header-user'
+import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/')({
-  beforeLoad: ({ context }) => {
-    if (!context.isAuthenticated) throw redirect({ to: '/login' })
-  },
+export const Route = createFileRoute('/_app/')({
   component: Home,
 })
 
 function Home() {
   return (
-    <div className="flex items-center justify-between p-8">
-      <h1 className="text-4xl font-bold">TraceHub</h1>
-      <BetterAuthHeader />
+    <div>
+      <h1 className="text-2xl font-semibold">Repositories</h1>
+      <p className="text-muted-foreground">Repos you can access will show up here.</p>
     </div>
   )
 }

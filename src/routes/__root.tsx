@@ -11,6 +11,7 @@ import type { AuthClient } from '@convex-dev/better-auth/react'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
+import { ThemeProvider, themeInitScript } from '#/components/theme-provider'
 import { authClient } from '#/lib/auth-client'
 import { getToken } from '#/lib/auth-server'
 
@@ -49,6 +50,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         title: 'TraceHub',
       },
     ],
+    scripts: [{ children: themeInitScript }],
     links: [
       {
         rel: 'stylesheet',
@@ -69,14 +71,16 @@ function RootComponent() {
       authClient={authClient as unknown as AuthClient}
       initialToken={token}
     >
-      <Outlet />
+      <ThemeProvider>
+        <Outlet />
+      </ThemeProvider>
     </ConvexBetterAuthProvider>
   )
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
