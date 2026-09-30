@@ -18,6 +18,10 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppReposRepoIdIndexRouteImport } from './routes/_app/repos.$repoId.index'
 import { Route as AppReposRepoIdBranchesSplatRouteImport } from './routes/_app/repos.$repoId.branches.$'
 import { Route as AppReposRepoIdPullsNumberRouteImport } from './routes/_app/repos.$repoId.pulls.$number'
+import { Route as AppReposRepoIdRunsRunIdRouteImport } from './routes/_app/repos.$repoId.runs.$runId'
+import { Route as AppReposRepoIdTracesTraceIdRouteImport } from './routes/_app/repos.$repoId.traces.$traceId'
+import { Route as AppReposRepoIdTracesCreateRouteImport } from './routes/_app/repos.$repoId.traces.create'
+import { Route as ApiReposRepoIdTracesTraceIdTraceDotzipRouteImport } from './routes/api/repos.$repoId.traces.$traceId.trace[.]zip'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -65,6 +69,29 @@ const AppReposRepoIdPullsNumberRoute =
     path: '/pulls/$number',
     getParentRoute: () => AppReposRepoIdRoute,
   } as any)
+const AppReposRepoIdRunsRunIdRoute = AppReposRepoIdRunsRunIdRouteImport.update({
+  id: '/runs/$runId',
+  path: '/runs/$runId',
+  getParentRoute: () => AppReposRepoIdRoute,
+} as any)
+const AppReposRepoIdTracesTraceIdRoute =
+  AppReposRepoIdTracesTraceIdRouteImport.update({
+    id: '/traces/$traceId',
+    path: '/traces/$traceId',
+    getParentRoute: () => AppReposRepoIdRoute,
+  } as any)
+const AppReposRepoIdTracesCreateRoute =
+  AppReposRepoIdTracesCreateRouteImport.update({
+    id: '/traces/create',
+    path: '/traces/create',
+    getParentRoute: () => AppReposRepoIdRoute,
+  } as any)
+const ApiReposRepoIdTracesTraceIdTraceDotzipRoute =
+  ApiReposRepoIdTracesTraceIdTraceDotzipRouteImport.update({
+    id: '/api/repos/$repoId/traces/$traceId/trace.zip',
+    path: '/api/repos/$repoId/traces/$traceId/trace.zip',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -75,6 +102,10 @@ export interface FileRoutesByFullPath {
   '/repos/$repoId/': typeof AppReposRepoIdIndexRoute
   '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
   '/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
+  '/repos/$repoId/runs/$runId': typeof AppReposRepoIdRunsRunIdRoute
+  '/repos/$repoId/traces/$traceId': typeof AppReposRepoIdTracesTraceIdRoute
+  '/repos/$repoId/traces/create': typeof AppReposRepoIdTracesCreateRoute
+  '/api/repos/$repoId/traces/$traceId/trace.zip': typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -84,6 +115,10 @@ export interface FileRoutesByTo {
   '/repos/$repoId': typeof AppReposRepoIdIndexRoute
   '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
   '/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
+  '/repos/$repoId/runs/$runId': typeof AppReposRepoIdRunsRunIdRoute
+  '/repos/$repoId/traces/$traceId': typeof AppReposRepoIdTracesTraceIdRoute
+  '/repos/$repoId/traces/create': typeof AppReposRepoIdTracesCreateRoute
+  '/api/repos/$repoId/traces/$traceId/trace.zip': typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -96,6 +131,10 @@ export interface FileRoutesById {
   '/_app/repos/$repoId/': typeof AppReposRepoIdIndexRoute
   '/_app/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
   '/_app/repos/$repoId/pulls/$number': typeof AppReposRepoIdPullsNumberRoute
+  '/_app/repos/$repoId/runs/$runId': typeof AppReposRepoIdRunsRunIdRoute
+  '/_app/repos/$repoId/traces/$traceId': typeof AppReposRepoIdTracesTraceIdRoute
+  '/_app/repos/$repoId/traces/create': typeof AppReposRepoIdTracesCreateRoute
+  '/api/repos/$repoId/traces/$traceId/trace.zip': typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -108,6 +147,10 @@ export interface FileRouteTypes {
     | '/repos/$repoId/'
     | '/repos/$repoId/branches/$'
     | '/repos/$repoId/pulls/$number'
+    | '/repos/$repoId/runs/$runId'
+    | '/repos/$repoId/traces/$traceId'
+    | '/repos/$repoId/traces/create'
+    | '/api/repos/$repoId/traces/$traceId/trace.zip'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -117,6 +160,10 @@ export interface FileRouteTypes {
     | '/repos/$repoId'
     | '/repos/$repoId/branches/$'
     | '/repos/$repoId/pulls/$number'
+    | '/repos/$repoId/runs/$runId'
+    | '/repos/$repoId/traces/$traceId'
+    | '/repos/$repoId/traces/create'
+    | '/api/repos/$repoId/traces/$traceId/trace.zip'
   id:
     | '__root__'
     | '/_app'
@@ -128,12 +175,17 @@ export interface FileRouteTypes {
     | '/_app/repos/$repoId/'
     | '/_app/repos/$repoId/branches/$'
     | '/_app/repos/$repoId/pulls/$number'
+    | '/_app/repos/$repoId/runs/$runId'
+    | '/_app/repos/$repoId/traces/$traceId'
+    | '/_app/repos/$repoId/traces/create'
+    | '/api/repos/$repoId/traces/$traceId/trace.zip'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiReposRepoIdTracesTraceIdTraceDotzipRoute: typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -201,6 +253,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReposRepoIdPullsNumberRouteImport
       parentRoute: typeof AppReposRepoIdRoute
     }
+    '/_app/repos/$repoId/runs/$runId': {
+      id: '/_app/repos/$repoId/runs/$runId'
+      path: '/runs/$runId'
+      fullPath: '/repos/$repoId/runs/$runId'
+      preLoaderRoute: typeof AppReposRepoIdRunsRunIdRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
+    '/_app/repos/$repoId/traces/$traceId': {
+      id: '/_app/repos/$repoId/traces/$traceId'
+      path: '/traces/$traceId'
+      fullPath: '/repos/$repoId/traces/$traceId'
+      preLoaderRoute: typeof AppReposRepoIdTracesTraceIdRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
+    '/_app/repos/$repoId/traces/create': {
+      id: '/_app/repos/$repoId/traces/create'
+      path: '/traces/create'
+      fullPath: '/repos/$repoId/traces/create'
+      preLoaderRoute: typeof AppReposRepoIdTracesCreateRouteImport
+      parentRoute: typeof AppReposRepoIdRoute
+    }
+    '/api/repos/$repoId/traces/$traceId/trace.zip': {
+      id: '/api/repos/$repoId/traces/$traceId/trace.zip'
+      path: '/api/repos/$repoId/traces/$traceId/trace.zip'
+      fullPath: '/api/repos/$repoId/traces/$traceId/trace.zip'
+      preLoaderRoute: typeof ApiReposRepoIdTracesTraceIdTraceDotzipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -208,12 +288,18 @@ interface AppReposRepoIdRouteChildren {
   AppReposRepoIdIndexRoute: typeof AppReposRepoIdIndexRoute
   AppReposRepoIdBranchesSplatRoute: typeof AppReposRepoIdBranchesSplatRoute
   AppReposRepoIdPullsNumberRoute: typeof AppReposRepoIdPullsNumberRoute
+  AppReposRepoIdRunsRunIdRoute: typeof AppReposRepoIdRunsRunIdRoute
+  AppReposRepoIdTracesTraceIdRoute: typeof AppReposRepoIdTracesTraceIdRoute
+  AppReposRepoIdTracesCreateRoute: typeof AppReposRepoIdTracesCreateRoute
 }
 
 const AppReposRepoIdRouteChildren: AppReposRepoIdRouteChildren = {
   AppReposRepoIdIndexRoute: AppReposRepoIdIndexRoute,
   AppReposRepoIdBranchesSplatRoute: AppReposRepoIdBranchesSplatRoute,
   AppReposRepoIdPullsNumberRoute: AppReposRepoIdPullsNumberRoute,
+  AppReposRepoIdRunsRunIdRoute: AppReposRepoIdRunsRunIdRoute,
+  AppReposRepoIdTracesTraceIdRoute: AppReposRepoIdTracesTraceIdRoute,
+  AppReposRepoIdTracesCreateRoute: AppReposRepoIdTracesCreateRoute,
 }
 
 const AppReposRepoIdRouteWithChildren = AppReposRepoIdRoute._addFileChildren(
@@ -238,6 +324,8 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiReposRepoIdTracesTraceIdTraceDotzipRoute:
+    ApiReposRepoIdTracesTraceIdTraceDotzipRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

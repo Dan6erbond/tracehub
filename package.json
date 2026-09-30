@@ -6,10 +6,13 @@
     "#/*": "./src/*"
   },
   "scripts": {
+    "copy-trace-viewer": "node scripts/copy-trace-viewer.mjs",
+    "predev": "npm run copy-trace-viewer",
     "dev": "vite dev --port 3000",
     "convex:dev": "convex dev",
     "convex:dashboard": "convex dashboard",
     "generate-routes": "tsr generate",
+    "prebuild": "npm run copy-trace-viewer",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint",

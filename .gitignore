@@ -14,3 +14,6 @@ todos.json
 
 # Convex codegen
 _generated/
+
+# Self-hosted Playwright trace viewer, copied from playwright-core
+public/trace
