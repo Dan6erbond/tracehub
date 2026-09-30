@@ -1,0 +1,28 @@
+import { betterAuth } from 'better-auth/minimal'
+import { createClient } from '@convex-dev/better-auth'
+import { convex } from '@convex-dev/better-auth/plugins'
+import authConfig from './auth.config'
+import { components } from './_generated/api'
+import { query } from './_generated/server'
+import type { GenericCtx } from '@convex-dev/better-auth'
+import type { DataModel } from './_generated/dataModel'
+
+export const authComponent = createClient<DataModel>(components.betterAuth)
+
+export const createAuth = (ctx: GenericCtx<DataModel>) =>
+  betterAuth({
+    baseURL: process.env.SITE_URL!,
+    database: authComponent.adapter(ctx),
+    socialProviders: {
+      github: {
+        clientId: process.env.GITHUB_CLIENT_ID!,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      },
+    },
+    plugins: [convex({ authConfig })],
+  })
+
+export const getCurrentUser = query({
+  args: {},
+  handler: (ctx) => authComponent.getAuthUser(ctx),
+})
