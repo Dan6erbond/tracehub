@@ -1,5 +1,5 @@
-import { Link } from '@tanstack/react-router'
 import { Play } from 'lucide-react'
+import { LinkRow, RowLink } from '#/components/row-link'
 import { TraceStatusBadge } from '#/components/trace-status-badge'
 import { Button } from '#/components/ui/button'
 import {
@@ -27,7 +27,7 @@ export function TraceTable({ traces }: { traces: Array<Doc<'traces'>> }) {
       </TableHeader>
       <TableBody>
         {traces.map((trace) => (
-          <TableRow key={trace._id}>
+          <LinkRow key={trace._id}>
             <TableCell className="max-w-md truncate" title={trace.title}>
               {trace.title}
             </TableCell>
@@ -42,16 +42,16 @@ export function TraceTable({ traces }: { traces: Array<Doc<'traces'>> }) {
             <TableCell>{formatBytes(trace.size)}</TableCell>
             <TableCell className="text-right">
               <Button asChild variant="outline" size="sm">
-                <Link
+                <RowLink
                   to="/repos/$repoId/traces/$traceId"
                   params={{ repoId: trace.repoId, traceId: trace._id }}
                 >
                   <Play />
                   Open
-                </Link>
+                </RowLink>
               </Button>
             </TableCell>
-          </TableRow>
+          </LinkRow>
         ))}
       </TableBody>
     </Table>

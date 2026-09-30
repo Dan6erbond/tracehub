@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { LinkRow, RowLink } from '#/components/row-link'
 import { Badge } from '#/components/ui/badge'
 import { VisibilityBadge } from '#/components/visibility-badge'
 import {
@@ -23,15 +23,15 @@ export function RepoList({ repos }: { repos: Array<Doc<'repos'>> }) {
       </TableHeader>
       <TableBody>
         {repos.map((repo) => (
-          <TableRow key={repo._id} className="relative">
+          <LinkRow key={repo._id}>
             <TableCell className="whitespace-normal">
-              <Link
+              <RowLink
                 to="/repos/$repoId"
                 params={{ repoId: repo._id }}
-                className="font-medium after:absolute after:inset-0"
+                className="font-medium"
               >
                 {repo.fullName}
-              </Link>
+              </RowLink>
               {repo.description && (
                 <div className="text-sm text-muted-foreground">
                   {repo.description}
@@ -46,7 +46,7 @@ export function RepoList({ repos }: { repos: Array<Doc<'repos'>> }) {
             <TableCell>
               <VisibilityBadge repo={repo} />
             </TableCell>
-          </TableRow>
+          </LinkRow>
         ))}
       </TableBody>
     </Table>
