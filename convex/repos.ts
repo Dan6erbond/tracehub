@@ -32,7 +32,8 @@ import type { Doc } from './_generated/dataModel'
 const PRUNE_JOBS_SHA_BATCH_SIZE = 25
 
 // Each repo of a batch is upserted and linked in one mutation, so the batch size bounds its reads and writes.
-const SYNC_REPOS_BATCH_SIZE = 50
+// Each repo costs two nested queries plus the repos trigger's writes; larger batches exceed the mutation's system operation limit.
+const SYNC_REPOS_BATCH_SIZE = 10
 const PRUNE_LINKS_BATCH_SIZE = 200
 
 export const listRepos = authedQuery({
