@@ -7,14 +7,14 @@ export function HostBadge({
   repo,
   href,
 }: {
-  repo: Pick<RepoView, 'providerLabel'>
+  repo: Pick<RepoView, 'providerName'>
   href?: string
 }) {
-  if (!href) return <Badge variant="secondary">{repo.providerLabel}</Badge>
+  if (!href) return <Badge variant="secondary">{repo.providerName}</Badge>
   return (
     <Badge asChild variant="outline">
       <a href={href} target="_blank" rel="noreferrer">
-        {repo.providerLabel}
+        {repo.providerName}
         <ExternalLink />
       </a>
     </Badge>

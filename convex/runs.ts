@@ -25,6 +25,7 @@ import {
   runUploadSchema,
 } from '../src/lib/schemas/run'
 import type { ResolvedRunScope } from '../src/lib/schemas/run'
+import type { RepoHost } from './lib/gitProviders/types'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type {
@@ -55,8 +56,7 @@ const withTraceCounts = async (
 
 /** `jobs` and `pipelines` the caller already loaded are used instead of fetching them again for every run. */
 export const withRunDetails = async (
-  ctx: QueryCtx,
-  repo: Doc<'repos'>,
+  ctx: QueryCtx & RepoHost,
   run: Doc<'runs'>,
   {
     jobs = [],
@@ -85,11 +85,11 @@ export const withRunDetails = async (
           id: pipelineId,
         })),
   ])
-  const linkedJob = job && withJobLinks(repo, job, pipeline)
-  const linkedPipeline = pipeline && withPipelineLinks(repo, pipeline)
+  const linkedJob = job && withJobLinks(ctx, job, pipeline)
+  const linkedPipeline = pipeline && withPipelineLinks(ctx, pipeline)
   return {
     ...counted,
-    commitUrl: commitUrl(repo, run.sha),
+    commitUrl: commitUrl(ctx, run.sha),
     job: linkedJob,
     pipeline: linkedPipeline,
     ciUrl: linkedJob?.url ?? linkedPipeline?.url,
@@ -130,7 +130,7 @@ export const getRun = repoQuery({
       internal.runs.findInRepo,
       { repoId, id: runId },
     )
-    return run && withRunDetails(ctx, ctx.repo, run)
+    return run && withRunDetails(ctx, run)
   },
 })
 
@@ -193,7 +193,7 @@ export const listRuns = repoQuery({
       PINNED_FIRST,
     )
     return scoped
-      .map((run) => withRunDetails(ctx, ctx.repo, run))
+      .map((run) => withRunDetails(ctx, run))
       .paginate(paginationOpts)
   },
 })
@@ -222,7 +222,7 @@ export const listJobRuns = repoQuery({
       .withIndex('by_job', (q) => q.eq('jobId', jobId))
       .order('desc')
       .map((run) =>
-        withRunDetails(ctx, ctx.repo, run, {
+        withRunDetails(ctx, run, {
           jobs: [job],
           pipelines: pipeline ? [pipeline] : [],
         }),
@@ -254,9 +254,7 @@ export const listPipelineRuns = repoQuery({
       .query('runs')
       .withIndex('by_pipeline', (q) => q.eq('pipelineId', pipelineId))
       .order('desc')
-      .map((run) =>
-        withRunDetails(ctx, ctx.repo, run, { jobs, pipelines: [pipeline] }),
-      )
+      .map((run) => withRunDetails(ctx, run, { jobs, pipelines: [pipeline] }))
       .paginate(paginationOpts)
   },
 })

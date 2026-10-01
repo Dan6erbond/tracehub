@@ -20,6 +20,9 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AppReposRepoIdRouteImport } from './routes/_app/repos.$repoId'
+import { Route as AdminProvidersIndexRouteImport } from './routes/admin/providers.index'
+import { Route as AdminProvidersProviderIdRouteImport } from './routes/admin/providers.$providerId'
+import { Route as AdminProvidersNewRouteImport } from './routes/admin/providers.new'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppReposRepoIdIndexRouteImport } from './routes/_app/repos.$repoId.index'
 import { Route as AppReposRepoIdBranchesSplatRouteImport } from './routes/_app/repos.$repoId.branches.$'
@@ -85,6 +88,22 @@ const AppReposRepoIdRoute = AppReposRepoIdRouteImport.update({
   id: '/repos/$repoId',
   path: '/repos/$repoId',
   getParentRoute: () => AppRoute,
+} as any)
+const AdminProvidersIndexRoute = AdminProvidersIndexRouteImport.update({
+  id: '/providers/',
+  path: '/providers/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProvidersProviderIdRoute =
+  AdminProvidersProviderIdRouteImport.update({
+    id: '/providers/$providerId',
+    path: '/providers/$providerId',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminProvidersNewRoute = AdminProvidersNewRouteImport.update({
+  id: '/providers/new',
+  path: '/providers/new',
+  getParentRoute: () => AdminRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -160,7 +179,10 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
   '/repos/$repoId': typeof AppReposRepoIdRouteWithChildren
+  '/admin/providers/$providerId': typeof AdminProvidersProviderIdRoute
+  '/admin/providers/new': typeof AdminProvidersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/admin/providers/': typeof AdminProvidersIndexRoute
   '/repos/$repoId/': typeof AppReposRepoIdIndexRoute
   '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
   '/repos/$repoId/jobs/$jobId': typeof AppReposRepoIdJobsJobIdRoute
@@ -181,7 +203,10 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/': typeof AppIndexRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/providers/$providerId': typeof AdminProvidersProviderIdRoute
+  '/admin/providers/new': typeof AdminProvidersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/admin/providers': typeof AdminProvidersIndexRoute
   '/repos/$repoId': typeof AppReposRepoIdIndexRoute
   '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
   '/repos/$repoId/jobs/$jobId': typeof AppReposRepoIdJobsJobIdRoute
@@ -206,7 +231,10 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/_app/repos/$repoId': typeof AppReposRepoIdRouteWithChildren
+  '/admin/providers/$providerId': typeof AdminProvidersProviderIdRoute
+  '/admin/providers/new': typeof AdminProvidersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/admin/providers/': typeof AdminProvidersIndexRoute
   '/_app/repos/$repoId/': typeof AppReposRepoIdIndexRoute
   '/_app/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
   '/_app/repos/$repoId/jobs/$jobId': typeof AppReposRepoIdJobsJobIdRoute
@@ -231,7 +259,10 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/'
     | '/repos/$repoId'
+    | '/admin/providers/$providerId'
+    | '/admin/providers/new'
     | '/api/auth/$'
+    | '/admin/providers/'
     | '/repos/$repoId/'
     | '/repos/$repoId/branches/$'
     | '/repos/$repoId/jobs/$jobId'
@@ -252,7 +283,10 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/'
     | '/admin'
+    | '/admin/providers/$providerId'
+    | '/admin/providers/new'
     | '/api/auth/$'
+    | '/admin/providers'
     | '/repos/$repoId'
     | '/repos/$repoId/branches/$'
     | '/repos/$repoId/jobs/$jobId'
@@ -276,7 +310,10 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/admin/'
     | '/_app/repos/$repoId'
+    | '/admin/providers/$providerId'
+    | '/admin/providers/new'
     | '/api/auth/$'
+    | '/admin/providers/'
     | '/_app/repos/$repoId/'
     | '/_app/repos/$repoId/branches/$'
     | '/_app/repos/$repoId/jobs/$jobId'
@@ -377,6 +414,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/repos/$repoId'
       preLoaderRoute: typeof AppReposRepoIdRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/admin/providers/': {
+      id: '/admin/providers/'
+      path: '/providers'
+      fullPath: '/admin/providers/'
+      preLoaderRoute: typeof AdminProvidersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/providers/$providerId': {
+      id: '/admin/providers/$providerId'
+      path: '/providers/$providerId'
+      fullPath: '/admin/providers/$providerId'
+      preLoaderRoute: typeof AdminProvidersProviderIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/providers/new': {
+      id: '/admin/providers/new'
+      path: '/providers/new'
+      fullPath: '/admin/providers/new'
+      preLoaderRoute: typeof AdminProvidersNewRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -505,12 +563,18 @@ interface AdminRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminProvidersProviderIdRoute: typeof AdminProvidersProviderIdRoute
+  AdminProvidersNewRoute: typeof AdminProvidersNewRoute
+  AdminProvidersIndexRoute: typeof AdminProvidersIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminProvidersProviderIdRoute: AdminProvidersProviderIdRoute,
+  AdminProvidersNewRoute: AdminProvidersNewRoute,
+  AdminProvidersIndexRoute: AdminProvidersIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

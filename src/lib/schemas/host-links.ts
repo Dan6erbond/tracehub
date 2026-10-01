@@ -3,11 +3,11 @@ import { zid } from 'convex-helpers/server/zod4'
 import { repoSchema } from './repo'
 
 /** A repo as queries return it: the stored fields plus where it lives on its Git host. */
-export const repoViewSchema = repoSchema.omit({ htmlUrl: true }).extend({
+export const repoViewSchema = repoSchema.extend({
   _id: zid('repos'),
   _creationTime: z.number(),
   url: z.string(),
-  providerLabel: z.string(),
+  providerName: z.string(),
 })
 export type RepoView = z.infer<typeof repoViewSchema>
 

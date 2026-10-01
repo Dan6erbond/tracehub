@@ -11,6 +11,7 @@ import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
 import { insertAndGet, replaceOrInsert, uniqueBy } from './lib/upsert'
 import { ciJobSchema } from '../src/lib/schemas/ci-job'
 import { httpUrlSchema } from '../src/lib/schemas/url'
+import type { RepoHost } from './lib/gitProviders/types'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { CiPage, CommitLink } from '../src/lib/schemas/host-links'
@@ -408,13 +409,12 @@ export const pruneJobs = zInternalMutation({
 })
 
 const withRunCounts = async (
-  ctx: QueryCtx,
-  repo: Doc<'repos'>,
+  ctx: QueryCtx & RepoHost,
   jobs: Array<Doc<'ciJobs'>>,
   pipeline?: Doc<'ciPipelines'>,
 ): Promise<CiJobListing> => ({
   jobs: await asyncMap(jobs.slice(0, MAX_JOBS_PER_LIST), async (job) => ({
-    ...withJobLinks(repo, job, pipeline),
+    ...withJobLinks(ctx, job, pipeline),
     runCount: await ctx.runQuery(internal.runs.countForJob, { jobId: job._id }),
   })),
   truncated: jobs.length > MAX_JOBS_PER_LIST,
@@ -428,7 +428,7 @@ export const listOtherChecks = repoQuery({
       internal.ciJobs.listAtSha,
       { repoId, sha, limit: MAX_JOBS_PER_LIST + 1, outsidePipelines: true },
     )
-    return withRunCounts(ctx, ctx.repo, jobs)
+    return withRunCounts(ctx, jobs)
   },
 })
 
@@ -445,7 +445,7 @@ export const listPipelineJobs = repoQuery({
       internal.ciJobs.listForPipeline,
       { pipelineId },
     )
-    return withRunCounts(ctx, ctx.repo, jobs, pipeline)
+    return withRunCounts(ctx, jobs, pipeline)
   },
 })
 
@@ -474,8 +474,8 @@ export const getJob = repoQuery({
       jobId,
     })
     return {
-      job: { ...withJobLinks(ctx.repo, job, pipeline), runCount },
-      pipeline: pipeline && withPipelineLinks(ctx.repo, pipeline),
+      job: { ...withJobLinks(ctx, job, pipeline), runCount },
+      pipeline: pipeline && withPipelineLinks(ctx, pipeline),
     }
   },
 })

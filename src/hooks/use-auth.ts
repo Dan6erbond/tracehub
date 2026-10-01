@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { authClient } from '#/lib/auth-client'
+import { loginPath } from '#/lib/auth-errors'
 import { unwrapAuth } from '#/lib/auth-result'
 import type { SignIn } from '#/lib/schemas/sign-in'
 import type { SignUp } from '#/lib/schemas/sign-up'
@@ -11,6 +12,19 @@ export const useSignIn = () =>
   useMutation({
     mutationFn: (values: SignIn) => unwrapAuth(authClient.signIn.email(values)),
     onSuccess: () => enterApp('/'),
+  })
+
+/** Sends the user to the Git host to authorize; a failure there comes back to the login page as `?error=`. */
+export const useSocialSignIn = () =>
+  useMutation({
+    mutationFn: (providerSlug: string) =>
+      unwrapAuth(
+        authClient.signIn.social({
+          provider: providerSlug,
+          callbackURL: '/',
+          errorCallbackURL: loginPath,
+        }),
+      ),
   })
 
 /** Signs up and signs in; the first user of an instance becomes its admin. */

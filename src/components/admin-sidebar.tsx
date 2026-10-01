@@ -13,6 +13,7 @@ import {
 const ADMIN_LINKS = [
   { to: '/admin/settings', label: 'Settings', icon: Settings },
   { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/providers', label: 'Git providers', icon: GitBranch },
 ] as const
 
 export function AdminSidebar() {
@@ -46,12 +47,6 @@ export function AdminSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
-            <SidebarMenuItem>
-              <SidebarMenuButton disabled tooltip="Git providers (coming soon)">
-                <GitBranch />
-                <span>Git providers</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>

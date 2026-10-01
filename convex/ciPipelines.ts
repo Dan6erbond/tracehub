@@ -14,7 +14,7 @@ import {
   zInternalQuery,
 } from './lib/functions'
 import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
-import { gitProviders } from './lib/gitProviders'
+import { createAdapter } from './lib/gitProviders'
 import { withPipelineLinks } from './lib/hostLinks'
 import { scopedStream } from './lib/scopedStream'
 import { insertAndGet, replaceOrInsert, uniqueBy } from './lib/upsert'
@@ -23,6 +23,7 @@ import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { runScopeSchema } from '../src/lib/schemas/run'
 import { httpUrlSchema } from '../src/lib/schemas/url'
 import type { TraceCounts } from '../src/lib/schemas/trace'
+import type { RepoHost } from './lib/gitProviders/types'
 import type { Doc } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
 import type { CiPage, CommitLink } from '../src/lib/schemas/host-links'
@@ -117,11 +118,10 @@ export const upsertPipelines = zInternalMutation({
 })
 
 const withCounts = async (
-  ctx: QueryCtx,
-  repo: Doc<'repos'>,
+  ctx: QueryCtx & RepoHost,
   pipeline: Doc<'ciPipelines'>,
 ): Promise<PipelineWithCounts> => ({
-  ...withPipelineLinks(repo, pipeline),
+  ...withPipelineLinks(ctx, pipeline),
   traceCounts: await ctx.runQuery(internal.traceCounts.countPipelineTraces, {
     pipelineId: pipeline._id,
   }),
@@ -142,7 +142,7 @@ export const listPipelines = repoQuery({
       return pipelines
         .withIndex('by_repo_startedAt', (q) => q.eq('repoId', repoId))
         .order('desc')
-        .map((pipeline) => withCounts(ctx, ctx.repo, pipeline))
+        .map((pipeline) => withCounts(ctx, pipeline))
         .paginate(paginationOpts)
     const scoped = await scopedStream(
       ctx,
@@ -165,7 +165,7 @@ export const listPipelines = repoQuery({
       ['startedAt', '_creationTime'],
     )
     return scoped
-      .map((pipeline) => withCounts(ctx, ctx.repo, pipeline))
+      .map((pipeline) => withCounts(ctx, pipeline))
       .paginate(paginationOpts)
   },
 })
@@ -180,7 +180,7 @@ export const getPipeline = repoQuery({
       internal.ciPipelines.findInRepo,
       { repoId, id: pipelineId },
     )
-    return pipeline && withCounts(ctx, ctx.repo, pipeline)
+    return pipeline && withCounts(ctx, pipeline)
   },
 })
 
@@ -193,8 +193,8 @@ export const loadJobs = repoAction({
       { repoId, id: pipelineId },
     )
     if (!pipeline) throw new ConvexError('Pipeline not found')
-    const adapter = gitProviders[ctx.repo.provider]
-    const accessToken = await getProviderAccessToken(ctx, ctx.repo.provider)
+    const adapter = createAdapter(ctx.provider)
+    const accessToken = await getProviderAccessToken(ctx, ctx.provider)
     const jobs = await adapter.listPipelineJobs(accessToken, ctx.repo, pipeline)
     await ctx.runMutation(internal.ciJobs.upsertJobs, {
       repoId,

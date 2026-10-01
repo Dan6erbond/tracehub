@@ -1,12 +1,13 @@
 import { Octokit } from '@octokit/rest'
 import { toHttpUrl } from '../../../src/lib/schemas/url'
 import { chunk } from '../chunk'
+import { resolveApiUrl } from './apiUrl'
 import type { Branch } from '../../../src/lib/schemas/branch'
 import type { CiJob } from '../../../src/lib/schemas/ci-job'
 import type { CiPipeline } from '../../../src/lib/schemas/ci-pipeline'
 import type { CiStatus } from '../../../src/lib/schemas/ci-status'
 import type { PullRequest } from '../../../src/lib/schemas/pull-request'
-import type { GitProviderAdapter } from './types'
+import type { GitProviderAdapter, ProviderConfig } from './types'
 
 interface Connection<TNode> {
   nodes: Array<TNode | null>
@@ -202,146 +203,158 @@ interface PullRequestNode {
   author: { login: string } | null
 }
 
-export const githubAdapter: GitProviderAdapter = {
-  authProviderId: 'github',
-  listRepositories: async (accessToken) => {
-    const octokit = new Octokit({ auth: accessToken })
-    const repos = await octokit.paginate(
-      octokit.rest.repos.listForAuthenticatedUser,
-      { per_page: 100, affiliation: 'owner,collaborator,organization_member' },
-    )
-    return repos.map((repo) => ({
-      provider: 'github',
-      externalId: String(repo.id),
-      fullName: repo.full_name,
-      owner: repo.owner.login,
-      name: repo.name,
-      private: repo.private,
-      htmlUrl: repo.html_url,
-      description: repo.description ?? undefined,
-      defaultBranch: repo.default_branch,
-      pushedAt: repo.pushed_at ? Date.parse(repo.pushed_at) : undefined,
-    }))
-  },
-  listBranches: async function* (accessToken, { owner, name }) {
-    const octokit = new Octokit({ auth: accessToken })
-    const pages = paginate<BranchNode>(async (after) => {
-      const { repository } = await octokit.graphql<{
-        repository: { refs: Connection<BranchNode> }
-      }>(BRANCHES_QUERY, { owner, name, after })
-      return repository.refs
-    })
-    for await (const nodes of pages) {
-      const branches: Array<Branch> = []
-      for (const { name: branchName, target } of nodes) {
-        if (!target.oid || !target.committedDate) continue
-        const rollup = target.statusCheckRollup
-        branches.push({
-          name: branchName,
-          headSha: target.oid,
-          committedAt: Date.parse(target.committedDate),
-          ciStatus: rollup ? CI_STATUS[rollup.state] : undefined,
-        })
-      }
-      yield branches
-    }
-  },
-  listPullRequests: async function* (accessToken, { owner, name }, since) {
-    const octokit = new Octokit({ auth: accessToken })
-    const pages = paginate<PullRequestNode>(async (after) => {
-      const { repository } = await octokit.graphql<{
-        repository: { pullRequests: Connection<PullRequestNode> }
-      }>(PULL_REQUESTS_QUERY, { owner, name, after })
-      return repository.pullRequests
-    })
-    for await (const nodes of pages) {
-      const pullRequests: Array<PullRequest> = nodes.map((node) => ({
-        number: node.number,
-        title: node.title,
-        draft: node.isDraft,
-        headBranch: node.headRefName,
-        headSha: node.headRefOid,
-        baseBranch: node.baseRefName,
-        fromFork: node.isCrossRepository,
-        author: node.author?.login,
-        updatedAt: Date.parse(node.updatedAt),
-        closedAt: node.closedAt ? Date.parse(node.closedAt) : undefined,
-        mergedAt: node.mergedAt ? Date.parse(node.mergedAt) : undefined,
+export const createGithubAdapter = (
+  provider: ProviderConfig,
+): GitProviderAdapter => {
+  const baseUrl = resolveApiUrl(provider)
+  const createOctokit = (accessToken: string) =>
+    new Octokit({ auth: accessToken, baseUrl })
+  return {
+    listRepositories: async (accessToken) => {
+      const octokit = createOctokit(accessToken)
+      const repos = await octokit.paginate(
+        octokit.rest.repos.listForAuthenticatedUser,
+        {
+          per_page: 100,
+          affiliation: 'owner,collaborator,organization_member',
+        },
+      )
+      return repos.map((repo) => ({
+        providerId: provider._id,
+        externalId: String(repo.id),
+        fullName: repo.full_name,
+        owner: repo.owner.login,
+        name: repo.name,
+        private: repo.private,
+        description: repo.description ?? undefined,
+        defaultBranch: repo.default_branch,
+        pushedAt: repo.pushed_at ? Date.parse(repo.pushed_at) : undefined,
       }))
-      const fresh =
-        since === undefined
-          ? pullRequests
-          : pullRequests.filter((pr) => pr.updatedAt >= since)
-      if (fresh.length > 0) yield fresh
-      if (fresh.length < pullRequests.length) return
-    }
-  },
-  listJobs: async function* (accessToken, { owner, name }, shas) {
-    const octokit = new Octokit({ auth: accessToken })
-    const listCommitJobs = async (sha: string) => {
-      const pages = paginate<JobContextNode>(async (after) => {
-        const { repository } = await octokit.graphql<CommitJobsResponse>(
-          COMMIT_JOBS_QUERY,
-          { owner, name, oid: sha, after },
-        )
-        return repository.object?.statusCheckRollup?.contexts ?? NO_CONTEXTS
+    },
+    listBranches: async function* (accessToken, { owner, name }) {
+      const octokit = createOctokit(accessToken)
+      const pages = paginate<BranchNode>(async (after) => {
+        const { repository } = await octokit.graphql<{
+          repository: { refs: Connection<BranchNode> }
+        }>(BRANCHES_QUERY, { owner, name, after })
+        return repository.refs
       })
-      const jobs: Array<CiJob> = []
-      for await (const nodes of pages)
-        jobs.push(...nodes.map((node) => toJob(sha, node)))
-      return jobs
-    }
-    for (const batch of chunk(shas, JOBS_CONCURRENCY))
-      yield (await Promise.all(batch.map(listCommitJobs))).flat()
-  },
-  listPipelines: async function* (accessToken, { owner, name }) {
-    const octokit = new Octokit({ auth: accessToken })
-    const pages = octokit.paginate.iterator(
-      octokit.rest.actions.listWorkflowRunsForRepo,
-      { owner, repo: name, per_page: 100 },
-    )
-    let page = 0
-    for await (const { data } of pages) {
-      yield data.map((run): CiPipeline => {
-        // The typings omit that `head_repository` is null once a fork is deleted.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        const fromFork = run.head_repository?.id !== run.repository.id
-        return {
-          sha: run.head_sha,
-          externalId: String(run.id),
-          name: run.name ?? run.display_title,
-          status: toCiStatus(run.status, run.conclusion),
-          branch: fromFork ? undefined : (run.head_branch ?? undefined),
-          prNumber: run.pull_requests?.[0]?.number,
-          trigger: run.event,
-          startedAt: Date.parse(run.run_started_at ?? run.created_at),
-          completedAt:
-            run.status === 'completed' ? Date.parse(run.updated_at) : undefined,
+      for await (const nodes of pages) {
+        const branches: Array<Branch> = []
+        for (const { name: branchName, target } of nodes) {
+          if (!target.oid || !target.committedDate) continue
+          const rollup = target.statusCheckRollup
+          branches.push({
+            name: branchName,
+            headSha: target.oid,
+            committedAt: Date.parse(target.committedDate),
+            ciStatus: rollup ? CI_STATUS[rollup.state] : undefined,
+          })
         }
+        yield branches
+      }
+    },
+    listPullRequests: async function* (accessToken, { owner, name }, since) {
+      const octokit = createOctokit(accessToken)
+      const pages = paginate<PullRequestNode>(async (after) => {
+        const { repository } = await octokit.graphql<{
+          repository: { pullRequests: Connection<PullRequestNode> }
+        }>(PULL_REQUESTS_QUERY, { owner, name, after })
+        return repository.pullRequests
       })
-      if (++page >= PIPELINE_PAGES) return
-    }
-  },
-  listPipelineJobs: async (accessToken, { owner, name }, pipeline) => {
-    const octokit = new Octokit({ auth: accessToken })
-    const jobs = await octokit.paginate(
-      octokit.rest.actions.listJobsForWorkflowRun,
-      {
-        owner,
-        repo: name,
-        run_id: Number(pipeline.externalId),
-        filter: 'latest',
-        per_page: 100,
-      },
-    )
-    return jobs.map((job): CiJob => ({
-      sha: pipeline.sha,
-      externalId: String(job.id),
-      name: job.name,
-      status: toCiStatus(job.status, job.conclusion),
-      pipeline: pipeline.externalId,
-      startedAt: Date.parse(job.started_at),
-      completedAt: job.completed_at ? Date.parse(job.completed_at) : undefined,
-    }))
-  },
+      for await (const nodes of pages) {
+        const pullRequests: Array<PullRequest> = nodes.map((node) => ({
+          number: node.number,
+          title: node.title,
+          draft: node.isDraft,
+          headBranch: node.headRefName,
+          headSha: node.headRefOid,
+          baseBranch: node.baseRefName,
+          fromFork: node.isCrossRepository,
+          author: node.author?.login,
+          updatedAt: Date.parse(node.updatedAt),
+          closedAt: node.closedAt ? Date.parse(node.closedAt) : undefined,
+          mergedAt: node.mergedAt ? Date.parse(node.mergedAt) : undefined,
+        }))
+        const fresh =
+          since === undefined
+            ? pullRequests
+            : pullRequests.filter((pr) => pr.updatedAt >= since)
+        if (fresh.length > 0) yield fresh
+        if (fresh.length < pullRequests.length) return
+      }
+    },
+    listJobs: async function* (accessToken, { owner, name }, shas) {
+      const octokit = createOctokit(accessToken)
+      const listCommitJobs = async (sha: string) => {
+        const pages = paginate<JobContextNode>(async (after) => {
+          const { repository } = await octokit.graphql<CommitJobsResponse>(
+            COMMIT_JOBS_QUERY,
+            { owner, name, oid: sha, after },
+          )
+          return repository.object?.statusCheckRollup?.contexts ?? NO_CONTEXTS
+        })
+        const jobs: Array<CiJob> = []
+        for await (const nodes of pages)
+          jobs.push(...nodes.map((node) => toJob(sha, node)))
+        return jobs
+      }
+      for (const batch of chunk(shas, JOBS_CONCURRENCY))
+        yield (await Promise.all(batch.map(listCommitJobs))).flat()
+    },
+    listPipelines: async function* (accessToken, { owner, name }) {
+      const octokit = createOctokit(accessToken)
+      const pages = octokit.paginate.iterator(
+        octokit.rest.actions.listWorkflowRunsForRepo,
+        { owner, repo: name, per_page: 100 },
+      )
+      let page = 0
+      for await (const { data } of pages) {
+        yield data.map((run): CiPipeline => {
+          // The typings omit that `head_repository` is null once a fork is deleted.
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          const fromFork = run.head_repository?.id !== run.repository.id
+          return {
+            sha: run.head_sha,
+            externalId: String(run.id),
+            name: run.name ?? run.display_title,
+            status: toCiStatus(run.status, run.conclusion),
+            branch: fromFork ? undefined : (run.head_branch ?? undefined),
+            prNumber: run.pull_requests?.[0]?.number,
+            trigger: run.event,
+            startedAt: Date.parse(run.run_started_at ?? run.created_at),
+            completedAt:
+              run.status === 'completed'
+                ? Date.parse(run.updated_at)
+                : undefined,
+          }
+        })
+        if (++page >= PIPELINE_PAGES) return
+      }
+    },
+    listPipelineJobs: async (accessToken, { owner, name }, pipeline) => {
+      const octokit = createOctokit(accessToken)
+      const jobs = await octokit.paginate(
+        octokit.rest.actions.listJobsForWorkflowRun,
+        {
+          owner,
+          repo: name,
+          run_id: Number(pipeline.externalId),
+          filter: 'latest',
+          per_page: 100,
+        },
+      )
+      return jobs.map((job): CiJob => ({
+        sha: pipeline.sha,
+        externalId: String(job.id),
+        name: job.name,
+        status: toCiStatus(job.status, job.conclusion),
+        pipeline: pipeline.externalId,
+        startedAt: Date.parse(job.started_at),
+        completedAt: job.completed_at
+          ? Date.parse(job.completed_at)
+          : undefined,
+      }))
+    },
+  }
 }

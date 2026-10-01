@@ -1,14 +1,14 @@
 import type { StoredCiJob } from '../../../src/lib/schemas/ci-job'
 import type { CiPipeline } from '../../../src/lib/schemas/ci-pipeline'
-import type { GitProvider, Repo } from '../../../src/lib/schemas/repo'
+import type { GitProviderType } from '../../../src/lib/schemas/git-provider'
+import type { ProviderConfig, RepoHost } from './types'
+import type { Repo } from '../../../src/lib/schemas/repo'
 
-type HostRepo = Pick<Repo, 'provider' | 'htmlUrl'>
 type PipelineRef = Pick<CiPipeline, 'externalId' | 'url' | 'webPath'>
 type JobRef = Pick<StoredCiJob, 'externalId' | 'url' | 'webPath'>
 
 /** Pages of a Git host relative to a repo's URL. The id-based ones are `undefined` when the id has no page of its own. */
 type HostUrlScheme = {
-  label: string
   branchPath: (name: string) => string
   commitPath: (sha: string) => string
   pullPath: (number: number) => string
@@ -24,9 +24,8 @@ const encodePath = (path: string) =>
 
 const isNumericId = (id: string) => /^\d+$/.test(id)
 
-const hostUrlSchemes: Record<GitProvider, HostUrlScheme> = {
+const hostUrlSchemes: Record<GitProviderType, HostUrlScheme> = {
   github: {
-    label: 'GitHub',
     branchPath: (name) => `tree/${encodePath(name)}`,
     commitPath: (sha) => `commit/${sha}`,
     pullPath: (number) => `pull/${number}`,
@@ -43,52 +42,51 @@ const hostUrlSchemes: Record<GitProvider, HostUrlScheme> = {
 }
 
 /** The only place that decides where a repo's pages start. */
-export const repoBaseUrl = ({ htmlUrl }: Pick<Repo, 'htmlUrl'>) =>
-  htmlUrl.replace(/\/+$/, '')
+export const repoBaseUrl = (
+  { fullName }: Pick<Repo, 'fullName'>,
+  { baseUrl }: Pick<ProviderConfig, 'baseUrl'>,
+) => `${baseUrl}/${fullName}`
+
+const scheme = ({ provider }: RepoHost) => hostUrlSchemes[provider.type]
+
+const hostBase = ({ repo, provider }: RepoHost) => repoBaseUrl(repo, provider)
 
 /** A stored path is data from a host, so a result that leaves the repo's pages is dropped. */
-const pageUrl = (repo: Pick<Repo, 'htmlUrl'>, path?: string) => {
+const pageUrl = (host: RepoHost, path?: string) => {
   if (path === undefined) return undefined
-  const base = `${repoBaseUrl(repo)}/`
+  const base = `${hostBase(host)}/`
   const url = new URL(path, base).href
   return url.startsWith(base) ? url : undefined
 }
 
-export const providerLabel = ({ provider }: Pick<Repo, 'provider'>) =>
-  hostUrlSchemes[provider].label
+export const branchUrl = (host: RepoHost, name: string) =>
+  `${hostBase(host)}/${scheme(host).branchPath(name)}`
 
-export const branchUrl = (repo: HostRepo, name: string) =>
-  `${repoBaseUrl(repo)}/${hostUrlSchemes[repo.provider].branchPath(name)}`
+export const commitUrl = (host: RepoHost, sha: string) =>
+  `${hostBase(host)}/${scheme(host).commitPath(sha)}`
 
-export const commitUrl = (repo: HostRepo, sha: string) =>
-  `${repoBaseUrl(repo)}/${hostUrlSchemes[repo.provider].commitPath(sha)}`
-
-export const pullUrl = (repo: HostRepo, number: number) =>
-  `${repoBaseUrl(repo)}/${hostUrlSchemes[repo.provider].pullPath(number)}`
+export const pullUrl = (host: RepoHost, number: number) =>
+  `${hostBase(host)}/${scheme(host).pullPath(number)}`
 
 /** A pipeline's page: its own URL when the CI is outside the Git host, else the host's stored path, else derived from its id. */
-export const pipelineUrl = (repo: HostRepo, pipeline: PipelineRef) =>
+export const pipelineUrl = (host: RepoHost, pipeline: PipelineRef) =>
   pipeline.url ??
   pageUrl(
-    repo,
-    pipeline.webPath ??
-      hostUrlSchemes[repo.provider].pipelinePath(pipeline.externalId),
+    host,
+    pipeline.webPath ?? scheme(host).pipelinePath(pipeline.externalId),
   )
 
 /** A job's page: the commit status's own target, else the host's stored path, else derived from its id and the id of its pipeline. */
 export const jobUrl = (
-  repo: HostRepo,
+  host: RepoHost,
   job: JobRef,
   pipeline?: Pick<CiPipeline, 'externalId'> | null,
 ) =>
   job.url ??
   pageUrl(
-    repo,
+    host,
     job.webPath ??
       (job.externalId === undefined
         ? undefined
-        : hostUrlSchemes[repo.provider].jobPath(
-            job.externalId,
-            pipeline?.externalId,
-          )),
+        : scheme(host).jobPath(job.externalId, pipeline?.externalId)),
   )

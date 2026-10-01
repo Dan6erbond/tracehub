@@ -12,16 +12,20 @@ import {
   zInternalQuery,
 } from './lib/functions'
 import { chunk } from './lib/chunk'
+import { createAdapter } from './lib/gitProviders'
 import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
-import { gitProviders } from './lib/gitProviders'
 import { loadRepositories } from './lib/gitProviders/loadRepositories'
+import {
+  loadProviderConfig,
+  providerLoader,
+} from './lib/gitProviders/providerConfig'
 import { withRepoLinks } from './lib/hostLinks'
 import { repoActivityAt } from './lib/repoActivity'
 import { replaceOrInsert, uniqueBy } from './lib/upsert'
 import { withReloadLock } from './lib/withReloadLock'
 import { repoViewSchema } from '../src/lib/schemas/host-links'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
-import { gitProviderSchema, repoSchema } from '../src/lib/schemas/repo'
+import { repoSchema } from '../src/lib/schemas/repo'
 import type { PullRequest } from '../src/lib/schemas/pull-request'
 import type { Doc } from './_generated/dataModel'
 
@@ -35,9 +39,11 @@ export const listRepos = authedQuery({
   args: { search: z.string().optional(), paginationOpts: paginationOptsSchema },
   handler: async (ctx, { search, paginationOpts }) => {
     const term = search?.trim()
+    const loadProvider = providerLoader(ctx)
     const getRepoOfLink = async (link: Doc<'userRepos'>) => {
       const repo = await ctx.db.get('repos', link.repoId)
-      return repo && withRepoLinks(repo)
+      const provider = repo && (await loadProvider(repo.providerId))
+      return repo && provider?.enabled ? withRepoLinks(repo, provider) : null
     }
     if (term) {
       // Streams can't wrap a search index; results are ordered by relevance, not by activity.
@@ -60,14 +66,25 @@ export const listRepos = authedQuery({
 })
 
 export const findByExternalId = zInternalQuery({
-  args: { provider: gitProviderSchema, externalId: z.string() },
-  handler: (ctx, { provider, externalId }) =>
+  args: { providerId: zid('gitProviders'), externalId: z.string() },
+  handler: (ctx, { providerId, externalId }) =>
     ctx.db
       .query('repos')
       .withIndex('by_provider_externalId', (q) =>
-        q.eq('provider', provider).eq('externalId', externalId),
+        q.eq('providerId', providerId).eq('externalId', externalId),
       )
       .unique(),
+})
+
+export const existsForProvider = zInternalQuery({
+  args: { providerId: zid('gitProviders') },
+  handler: async (ctx, { providerId }) =>
+    (await ctx.db
+      .query('repos')
+      .withIndex('by_provider_externalId', (q) =>
+        q.eq('providerId', providerId),
+      )
+      .first()) !== null,
 })
 
 export const findUserRepoLink = zInternalQuery({
@@ -91,12 +108,12 @@ export const syncUserRepos = zInternalMutation({
     await asyncMap(
       uniqueBy(
         repos,
-        ({ provider, externalId }) => `${provider}\0${externalId}`,
+        ({ providerId, externalId }) => `${providerId}\0${externalId}`,
       ),
       async (repo) => {
         const existing: Doc<'repos'> | null = await ctx.runQuery(
           internal.repos.findByExternalId,
-          { provider: repo.provider, externalId: repo.externalId },
+          { providerId: repo.providerId, externalId: repo.externalId },
         )
         const stored = await replaceOrInsert(ctx, 'repos', existing, repo)
         const link: Doc<'userRepos'> | null = await ctx.runQuery(
@@ -129,7 +146,7 @@ export const syncUserRepos = zInternalMutation({
 export const pruneUserRepos = zInternalMutation({
   args: {
     userId: z.string(),
-    providers: z.array(gitProviderSchema),
+    providers: z.array(zid('gitProviders')),
     before: z.number(),
     cursor: z.string().nullable(),
   },
@@ -145,7 +162,7 @@ export const pruneUserRepos = zInternalMutation({
       .paginate({ numItems: PRUNE_LINKS_BATCH_SIZE, cursor })
     await asyncMap(page, async (link) => {
       const repo = await ctx.db.get('repos', link.repoId)
-      if (!repo || providers.includes(repo.provider))
+      if (!repo || providers.includes(repo.providerId))
         await ctx.db.delete('userRepos', link._id)
     })
     return isDone ? null : continueCursor
@@ -180,8 +197,8 @@ export const reloadRepo = repoAction({
   args: {},
   handler: (ctx, { repoId }) =>
     withReloadLock(ctx, { kind: 'repo', repoId }, async () => {
-      const adapter = gitProviders[ctx.repo.provider]
-      const accessToken = await getProviderAccessToken(ctx, ctx.repo.provider)
+      const adapter = createAdapter(ctx.provider)
+      const accessToken = await getProviderAccessToken(ctx, ctx.provider)
       const startedAt = Date.now()
 
       for await (const branches of adapter.listBranches(accessToken, ctx.repo))
@@ -265,6 +282,7 @@ export const getRepo = authedQuery({
       internal.repos.getUserRepo,
       { userId: ctx.userId, repoId },
     )
-    return repo && withRepoLinks(repo)
+    const provider = repo && (await loadProviderConfig(ctx, repo.providerId))
+    return repo && provider?.enabled ? withRepoLinks(repo, provider) : null
   },
 })

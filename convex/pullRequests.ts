@@ -45,7 +45,7 @@ export const getPullRequest = repoQuery({
       internal.pullRequests.getByNumber,
       { repoId, number },
     )
-    return pullRequest && withPullRequestLinks(ctx.repo, pullRequest)
+    return pullRequest && withPullRequestLinks(ctx, pullRequest)
   },
 })
 

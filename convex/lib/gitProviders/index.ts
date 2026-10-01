@@ -1,7 +1,10 @@
-import { githubAdapter } from './github'
-import type { GitProviderRegistry } from './types'
+import { createGithubAdapter } from './github'
+import type { GitProviderType } from '../../../src/lib/schemas/git-provider'
+import type { CreateAdapter } from './types'
 
-// Adding Gitea/Forgejo: extend `gitProviderSchema`, implement a GitProviderAdapter, register it here.
-export const gitProviders: GitProviderRegistry = {
-  github: githubAdapter,
+const adapterFactories: Record<GitProviderType, CreateAdapter> = {
+  github: createGithubAdapter,
 }
+
+export const createAdapter: CreateAdapter = (provider) =>
+  adapterFactories[provider.type](provider)

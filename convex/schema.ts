@@ -4,6 +4,7 @@ import { zodToConvexFields } from 'convex-helpers/server/zod4'
 import { branchSchema } from '../src/lib/schemas/branch'
 import { storedCiJobSchema } from '../src/lib/schemas/ci-job'
 import { ciPipelineSchema } from '../src/lib/schemas/ci-pipeline'
+import { gitProviderSchema } from '../src/lib/schemas/git-provider'
 import { instanceSettingsSchema } from '../src/lib/schemas/instance-settings'
 import { pullRequestSchema } from '../src/lib/schemas/pull-request'
 import { reloadLockSchema } from '../src/lib/schemas/reload-lock'
@@ -16,6 +17,9 @@ export default defineSchema({
   instanceSettings: defineTable(
     zodToConvexFields(instanceSettingsSchema.shape),
   ),
+  gitProviders: defineTable(zodToConvexFields(gitProviderSchema.shape))
+    .index('by_slug', ['slug'])
+    .index('by_enabled', ['enabled']),
   // Separate from repos and userRepos so lock writes never invalidate their queries.
   reloadLocks: defineTable(zodToConvexFields(reloadLockSchema.shape)).index(
     'by_key',
@@ -23,7 +27,7 @@ export default defineSchema({
   ),
   repos: defineTable(zodToConvexFields(repoSchema.shape)).index(
     'by_provider_externalId',
-    ['provider', 'externalId'],
+    ['providerId', 'externalId'],
   ),
   userRepos: defineTable({
     userId: v.string(),

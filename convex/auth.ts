@@ -7,9 +7,13 @@ import authConfig from './auth.config'
 import { components } from './_generated/api'
 import { env } from './_generated/server'
 import {
+  createProviderLoader,
+  gitProvidersPlugin,
+} from './lib/gitProviders/authPlugin'
+import {
   cleanUpDeletedUser,
+  createSignUpGates,
   gateSignUpRequest,
-  gateUserCreation,
 } from './lib/userHooks'
 import authSchema from './betterAuth/schema'
 import type { GenericCtx } from '@convex-dev/better-auth'
@@ -20,24 +24,20 @@ export const authComponent = createClient<DataModel, typeof authSchema>(
   { local: { schema: authSchema } },
 )
 
-export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
-  ({
+export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
+  const { gateUserCreation, gateAccountLinking } = createSignUpGates(ctx)
+  return {
     baseURL: env.SITE_URL,
     secret: env.BETTER_AUTH_SECRET,
     database: authComponent.adapter(ctx),
     // No mail sender exists, so addresses are not verified.
     emailAndPassword: { enabled: true },
-    socialProviders: {
-      github: {
-        clientId: env.GITHUB_CLIENT_ID,
-        clientSecret: env.GITHUB_CLIENT_SECRET,
-        // `repo` is needed to list private repositories
-        scope: ['repo'],
-      },
-    },
     account: {
-      // A forge account's email often differs from the password account's.
-      accountLinking: { enabled: true, allowDifferentEmails: true },
+      accountLinking: {
+        enabled: true,
+        // A forge account's email often differs from the password account's.
+        allowDifferentEmails: true,
+      },
     },
     user: {
       additionalFields: {
@@ -49,12 +49,18 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
     hooks: { before: gateSignUpRequest(ctx) },
     databaseHooks: {
       user: {
-        create: { before: gateUserCreation(ctx) },
+        create: { before: gateUserCreation },
         delete: { after: cleanUpDeletedUser(ctx) },
       },
+      account: { create: { before: gateAccountLinking } },
     },
-    plugins: [admin(), convex({ authConfig })],
-  }) satisfies BetterAuthOptions
+    plugins: [
+      admin(),
+      gitProvidersPlugin(createProviderLoader(ctx)),
+      convex({ authConfig }),
+    ],
+  } satisfies BetterAuthOptions
+}
 
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth(createAuthOptions(ctx))

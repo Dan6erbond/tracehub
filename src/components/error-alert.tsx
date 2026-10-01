@@ -1,5 +1,6 @@
 import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
+import { getErrorMessage } from '#/lib/errors'
 import type { ReactNode } from 'react'
 
 /** Shows nothing without an `error`; `children` replaces the error's message. */
@@ -14,7 +15,7 @@ export function ErrorAlert({
   return (
     <Alert variant="destructive">
       <CircleAlert />
-      <AlertDescription>{children ?? error.message}</AlertDescription>
+      <AlertDescription>{children ?? getErrorMessage(error)}</AlertDescription>
     </Alert>
   )
 }

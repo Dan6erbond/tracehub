@@ -11,6 +11,7 @@ import { branchSchema } from '../src/lib/schemas/branch'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import type { PullRequestWithLinks } from './lib/hostLinks'
 import type { CommitLink, HostPage } from '../src/lib/schemas/host-links'
+import type { RepoHost } from './lib/gitProviders/types'
 import type { Doc } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
 
@@ -20,8 +21,7 @@ const PRUNE_BATCH_SIZE = 500
 const MAX_BRANCHES_SCANNED_PER_PAGE = 500
 
 const withOpenPullRequests = async <T extends Doc<'branches'>>(
-  ctx: QueryCtx,
-  repo: Doc<'repos'>,
+  ctx: QueryCtx & RepoHost,
   branch: T,
 ) => {
   const pullRequests: Array<Doc<'pullRequests'>> = await ctx.runQuery(
@@ -31,7 +31,7 @@ const withOpenPullRequests = async <T extends Doc<'branches'>>(
   return {
     ...branch,
     pullRequests: pullRequests.map((pullRequest) =>
-      withPullRequestLinks(repo, pullRequest),
+      withPullRequestLinks(ctx, pullRequest),
     ),
   }
 }
@@ -53,15 +53,14 @@ export type BranchWithDetails = Doc<'branches'> &
   CommitLink & { pullRequests: Array<PullRequestWithLinks> }
 
 const withBranchDetails = async (
-  ctx: QueryCtx,
-  repo: Doc<'repos'>,
+  ctx: QueryCtx & RepoHost,
   branch: Doc<'branches'>,
 ): Promise<BranchWithDetails> => {
   const [{ ciStatus }, withPullRequests] = await Promise.all([
     withCiStatus(ctx, branch),
-    withOpenPullRequests(ctx, repo, branch),
+    withOpenPullRequests(ctx, branch),
   ])
-  return withBranchLinks(repo, { ...withPullRequests, ciStatus })
+  return withBranchLinks(ctx, { ...withPullRequests, ciStatus })
 }
 
 export const findByName = zInternalQuery({
@@ -80,7 +79,7 @@ export const getBranch = repoQuery({
       internal.branches.findByName,
       { repoId, name },
     )
-    return branch && withBranchDetails(ctx, ctx.repo, branch)
+    return branch && withBranchDetails(ctx, branch)
   },
 })
 
@@ -95,17 +94,10 @@ export const listBranches = repoQuery({
       .withIndex('by_repo_committedAt', (q) => q.eq('repoId', repoId))
       .order('desc')
       .map(async (branch): Promise<BranchWithDetails | null> => {
-        const withPullRequests = await withOpenPullRequests(
-          ctx,
-          ctx.repo,
-          branch,
-        )
+        const withPullRequests = await withOpenPullRequests(ctx, branch)
         if (openPullRequestsOnly && withPullRequests.pullRequests.length === 0)
           return null
-        return withBranchLinks(
-          ctx.repo,
-          await withCiStatus(ctx, withPullRequests),
-        )
+        return withBranchLinks(ctx, await withCiStatus(ctx, withPullRequests))
       })
       .paginate({
         ...paginationOpts,

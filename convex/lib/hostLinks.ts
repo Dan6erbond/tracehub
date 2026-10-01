@@ -3,11 +3,11 @@ import {
   commitUrl,
   jobUrl,
   pipelineUrl,
-  providerLabel,
   pullUrl,
   repoBaseUrl,
 } from './gitProviders/urls'
 import type { Doc } from '../_generated/dataModel'
+import type { ProviderConfig, RepoHost } from './gitProviders/types'
 import type {
   CiPage,
   CommitLink,
@@ -16,59 +16,59 @@ import type {
 } from '../../src/lib/schemas/host-links'
 
 /**
- * Mappers that add final host URLs to rows, so the frontend never builds one. Each takes the repo the query already loaded
+ * Mappers that add final host URLs to rows, so the frontend never builds one. Each takes the repo and provider the query already loaded
  * and works on single rows, so they compose with page and stream mappers without loading anything.
  */
 
 export type PullRequestWithLinks = Doc<'pullRequests'> & HostPage & CommitLink
 
-export const withRepoLinks = ({
-  htmlUrl,
-  ...repo
-}: Doc<'repos'>): RepoView => ({
+export const withRepoLinks = (
+  repo: Doc<'repos'>,
+  provider: ProviderConfig,
+): RepoView => ({
   ...repo,
-  url: repoBaseUrl({ htmlUrl }),
-  providerLabel: providerLabel(repo),
+  url: repoBaseUrl(repo, provider),
+  providerName: provider.name,
 })
 
 export const withBranchLinks = <T extends Doc<'branches'>>(
-  repo: Doc<'repos'>,
+  host: RepoHost,
   branch: T,
 ): T & HostPage & CommitLink => ({
   ...branch,
-  url: branchUrl(repo, branch.name),
-  commitUrl: commitUrl(repo, branch.headSha),
+  url: branchUrl(host, branch.name),
+  commitUrl: commitUrl(host, branch.headSha),
 })
 
 export const withPullRequestLinks = (
-  repo: Doc<'repos'>,
+  host: RepoHost,
   pullRequest: Doc<'pullRequests'>,
 ): PullRequestWithLinks => ({
   ...pullRequest,
-  url: pullUrl(repo, pullRequest.number),
-  commitUrl: commitUrl(repo, pullRequest.headSha),
+  url: pullUrl(host, pullRequest.number),
+  commitUrl: commitUrl(host, pullRequest.headSha),
 })
 
 export const withPipelineLinks = <T extends Doc<'ciPipelines'>>(
-  repo: Doc<'repos'>,
+  host: RepoHost,
   pipeline: T,
 ): T & CiPage & CommitLink => ({
   ...pipeline,
-  url: pipelineUrl(repo, pipeline),
-  commitUrl: commitUrl(repo, pipeline.sha),
+  url: pipelineUrl(host, pipeline),
+  commitUrl: commitUrl(host, pipeline.sha),
 })
 
 /** `pipeline`, when it is the job's own, lets the job link to its page within the pipeline. */
 export const withJobLinks = <T extends Doc<'ciJobs'>>(
-  repo: Doc<'repos'>,
+  host: RepoHost,
   job: T,
   pipeline?: Doc<'ciPipelines'> | null,
 ): T & CiPage & CommitLink => ({
   ...job,
   url: jobUrl(
-    repo,
+    host,
     job,
     pipeline && pipeline._id === job.pipelineId ? pipeline : null,
   ),
-  commitUrl: commitUrl(repo, job.sha),
+  commitUrl: commitUrl(host, job.sha),
 })
