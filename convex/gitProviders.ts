@@ -166,7 +166,7 @@ export const getCallbackBase = adminQuery({
 })
 
 export const create = adminMutation({
-  args: createGitProviderSchema.shape,
+  args: createGitProviderSchema,
   handler: async (ctx, { clientSecret, ...provider }) => {
     const taken: Doc<'gitProviders'> | null = await ctx.runQuery(
       internal.gitProviders.findBySlug,
@@ -191,7 +191,7 @@ export const create = adminMutation({
  * Linked accounts are matched by the host's numeric ids, so moving a provider to another address is only safe for the same instance, which the admin confirms.
  */
 export const update = adminMutation({
-  args: { providerId: zid('gitProviders'), ...updateGitProviderSchema.shape },
+  args: updateGitProviderSchema.extend({ providerId: zid('gitProviders') }),
   handler: async (
     ctx,
     { providerId, clientSecret, confirmHostChange, ...fields },

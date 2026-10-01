@@ -106,7 +106,7 @@ export const createRunWithTraces = repoMutation({
 })
 
 export const addTracesToRun = repoMutation({
-  args: { runId: zid('runs'), ...addTracesInputSchema.shape },
+  args: addTracesInputSchema.extend({ runId: zid('runs') }),
   handler: async (ctx, { repoId, runId, traces }): Promise<void> => {
     const run: Doc<'runs'> | null = await ctx.runQuery(
       internal.runs.findInRepo,

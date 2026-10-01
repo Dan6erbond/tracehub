@@ -7,14 +7,15 @@ import {
   passwordsMatch,
 } from './credentials'
 
-export const signUpFields = {
+export const signUpBaseSchema = z.object({
   name: nameSchema,
   email: emailSchema,
   password: newPasswordSchema,
   confirmPassword: z.string(),
-}
+})
 
-export const signUpSchema = z
-  .object(signUpFields)
-  .refine(passwordsMatch, passwordMismatch)
+export const signUpSchema = signUpBaseSchema.refine(
+  passwordsMatch,
+  passwordMismatch,
+)
 export type SignUp = z.infer<typeof signUpSchema>

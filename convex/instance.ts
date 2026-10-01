@@ -56,7 +56,7 @@ export const getSettings = adminQuery({
 })
 
 export const updateSettings = adminMutation({
-  args: instanceSettingsSchema.shape,
+  args: instanceSettingsSchema,
   handler: async (ctx, settings) => {
     const stored: Doc<'instanceSettings'> | null = await ctx.runQuery(
       internal.instance.findStoredSettings,

@@ -38,7 +38,10 @@ export const providerUrlSchema = httpUrlSchema.refine(isProviderUrl, {
     'Use an https:// address without credentials, query or fragment (http:// only for localhost)',
 })
 
-const configurableFields = {
+/** A provider as stored; `clientSecret` is encrypted. */
+export const gitProviderSchema = z.object({
+  slug: providerSlugSchema,
+  type: gitProviderTypeSchema,
   name: z.string().trim().min(1, 'Enter a name').max(64),
   baseUrl: providerUrlSchema,
   apiUrl: providerUrlSchema.optional(),
@@ -46,13 +49,6 @@ const configurableFields = {
   enabled: z.boolean(),
   allowSignUp: z.boolean(),
   trustedForLinking: z.boolean(),
-}
-
-/** A provider as stored; `clientSecret` is encrypted. */
-export const gitProviderSchema = z.object({
-  slug: providerSlugSchema,
-  type: gitProviderTypeSchema,
-  ...configurableFields,
   clientSecret: z.string(),
 })
 export type StoredGitProvider = z.infer<typeof gitProviderSchema>
@@ -75,12 +71,8 @@ export type GitProviderAdmin = z.infer<typeof gitProviderAdminSchema>
 const optionalUrlSchema = z.union([z.literal(''), providerUrlSchema])
 
 /** Forms hold an unset API URL as an empty string. */
-const inputFields = { ...configurableFields, apiUrl: optionalUrlSchema }
-
-export const createGitProviderSchema = z.object({
-  slug: providerSlugSchema,
-  type: gitProviderTypeSchema,
-  ...inputFields,
+export const createGitProviderSchema = gitProviderSchema.extend({
+  apiUrl: optionalUrlSchema,
   clientSecret: z.string().trim().min(1, 'Enter the client secret'),
 })
 export type CreateGitProvider = z.infer<typeof createGitProviderSchema>
@@ -89,11 +81,12 @@ export type CreateGitProvider = z.infer<typeof createGitProviderSchema>
  * The slug and type stay as created. An empty `clientSecret` keeps the stored one.
  * Pointing the provider at another address needs `confirmHostChange`: accounts and repos stay attached to it, so it must be the same instance moved, not a different server.
  */
-export const updateGitProviderSchema = z.object({
-  ...inputFields,
-  clientSecret: z.string().trim(),
-  confirmHostChange: z.boolean(),
-})
+export const updateGitProviderSchema = createGitProviderSchema
+  .omit({ slug: true, type: true })
+  .extend({
+    clientSecret: z.string().trim(),
+    confirmHostChange: z.boolean(),
+  })
 export type UpdateGitProvider = z.infer<typeof updateGitProviderSchema>
 
 export type TemplateField = 'slug' | 'name' | 'baseUrl' | 'apiUrl'

@@ -261,13 +261,12 @@ export const listPipelineRuns = repoQuery({
 
 /** Resolves the pipeline and job an upload names to stored ones, creating what the host has not reported yet. */
 export const resolveCi = zInternalMutation({
-  args: {
+  args: ciRefSchema.extend({
     repoId: zid('repos'),
     sha: z.string(),
     branch: z.string().optional(),
     prNumber: z.number().optional(),
-    ...ciRefSchema.shape,
-  },
+  }),
   handler: async (
     ctx,
     {
