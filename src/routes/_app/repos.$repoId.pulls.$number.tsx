@@ -2,7 +2,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { NotFound } from '#/components/not-found'
 import { PullRequestPage } from '#/components/pull-request-page'
-import { useCurrentRepo } from '#/hooks/use-current-repo'
 import { pullRequestQueryOptions } from '#/hooks/use-pull-requests'
 import { createZodParams } from '#/lib/create-zod-params'
 import { ensureEntity } from '#/lib/ensure-entity'
@@ -17,6 +16,6 @@ export const Route = createFileRoute('/_app/repos/$repoId/pulls/$number')({
 })
 
 function PullRequest() {
-  const { number } = Route.useParams()
-  return <PullRequestPage repo={useCurrentRepo()} number={number} />
+  const { repoId, number } = Route.useParams()
+  return <PullRequestPage repoId={repoId} number={number} />
 }

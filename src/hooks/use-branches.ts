@@ -4,7 +4,8 @@ import { convexQuery, useConvexAction } from '@convex-dev/react-query'
 import { usePaginatedQuery } from 'convex/react'
 import { useSuspenseEntity } from '#/hooks/use-suspense-entity'
 import { api } from '../../convex/_generated/api'
-import type { Doc, Id } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
+import type { RepoView } from '#/lib/schemas/host-links'
 
 export const BRANCHES_PAGE_SIZE = 20
 
@@ -35,7 +36,7 @@ export const useBranch = (repoId: Id<'repos'>, name: string) =>
 
 /** Lists branches with the repo's default branch always pinned first, even when the open-pull-request filter would hide it. */
 export function useBranchesDefaultFirst(
-  repo: Doc<'repos'>,
+  repo: RepoView,
   openPullRequestsOnly: boolean,
 ) {
   const { results, ...rest } = useBranches(repo._id, openPullRequestsOnly)

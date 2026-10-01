@@ -5,9 +5,12 @@ import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
 import schema from './schema'
 import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
+import { withBranchLinks, withPullRequestLinks } from './lib/hostLinks'
 import { replaceOrInsert, uniqueBy } from './lib/upsert'
 import { branchSchema } from '../src/lib/schemas/branch'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
+import type { PullRequestWithLinks } from './lib/hostLinks'
+import type { CommitLink, HostPage } from '../src/lib/schemas/host-links'
 import type { Doc } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
 
@@ -18,13 +21,19 @@ const MAX_BRANCHES_SCANNED_PER_PAGE = 500
 
 const withOpenPullRequests = async <T extends Doc<'branches'>>(
   ctx: QueryCtx,
+  repo: Doc<'repos'>,
   branch: T,
 ) => {
   const pullRequests: Array<Doc<'pullRequests'>> = await ctx.runQuery(
     internal.pullRequests.listOpenForBranch,
     { repoId: branch.repoId, branchName: branch.name },
   )
-  return { ...branch, pullRequests }
+  return {
+    ...branch,
+    pullRequests: pullRequests.map((pullRequest) =>
+      withPullRequestLinks(repo, pullRequest),
+    ),
+  }
 }
 
 /** The CI status of a branch is that of its latest pipeline, falling back to the host's rollup of the head commit (commit statuses). */
@@ -39,19 +48,20 @@ const withCiStatus = async <T extends Doc<'branches'>>(
   return { ...branch, ciStatus: latest?.status ?? branch.ciStatus }
 }
 
-type BranchWithDetails = Doc<'branches'> & {
-  pullRequests: Array<Doc<'pullRequests'>>
-}
+export type BranchWithDetails = Doc<'branches'> &
+  HostPage &
+  CommitLink & { pullRequests: Array<PullRequestWithLinks> }
 
 const withBranchDetails = async (
   ctx: QueryCtx,
+  repo: Doc<'repos'>,
   branch: Doc<'branches'>,
 ): Promise<BranchWithDetails> => {
   const [{ ciStatus }, withPullRequests] = await Promise.all([
     withCiStatus(ctx, branch),
-    withOpenPullRequests(ctx, branch),
+    withOpenPullRequests(ctx, repo, branch),
   ])
-  return { ...withPullRequests, ciStatus }
+  return withBranchLinks(repo, { ...withPullRequests, ciStatus })
 }
 
 export const findByName = zInternalQuery({
@@ -70,7 +80,7 @@ export const getBranch = repoQuery({
       internal.branches.findByName,
       { repoId, name },
     )
-    return branch && withBranchDetails(ctx, branch)
+    return branch && withBranchDetails(ctx, ctx.repo, branch)
   },
 })
 
@@ -85,10 +95,17 @@ export const listBranches = repoQuery({
       .withIndex('by_repo_committedAt', (q) => q.eq('repoId', repoId))
       .order('desc')
       .map(async (branch): Promise<BranchWithDetails | null> => {
-        const withPullRequests = await withOpenPullRequests(ctx, branch)
+        const withPullRequests = await withOpenPullRequests(
+          ctx,
+          ctx.repo,
+          branch,
+        )
         if (openPullRequestsOnly && withPullRequests.pullRequests.length === 0)
           return null
-        return withCiStatus(ctx, withPullRequests)
+        return withBranchLinks(
+          ctx.repo,
+          await withCiStatus(ctx, withPullRequests),
+        )
       })
       .paginate({
         ...paginationOpts,

@@ -6,16 +6,9 @@ import { PageHeader } from '#/components/page-header'
 import { PullRequestBadge } from '#/components/pull-request-badge'
 import { ScopeActivity } from '#/components/scope-activity'
 import { useBranch } from '#/hooks/use-branches'
-import { branchUrl } from '#/lib/git-host'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { RepoView } from '#/lib/schemas/host-links'
 
-export function BranchPage({
-  repo,
-  name,
-}: {
-  repo: Doc<'repos'>
-  name: string
-}) {
+export function BranchPage({ repo, name }: { repo: RepoView; name: string }) {
   const repoId = repo._id
   const branch = useBranch(repoId, name)
 
@@ -29,13 +22,13 @@ export function BranchPage({
         badges={
           <>
             {branch.ciStatus && <CiStatusBadge status={branch.ciStatus} />}
-            <HostBadge repo={repo} href={branchUrl(repo, branch.name)} />
+            <HostBadge repo={repo} href={branch.url} />
           </>
         }
         meta={
           <CommitTimestamp
-            repo={repo}
             sha={branch.headSha}
+            commitUrl={branch.commitUrl}
             timestamp={branch.committedAt}
           />
         }
@@ -53,7 +46,7 @@ export function BranchPage({
         )}
       </PageHeader>
       <ScopeActivity
-        repo={repo}
+        repoId={repoId}
         scope={{ kind: 'branch', branch: name }}
         headSha={branch.headSha}
         uploadTarget={{ branch: name }}

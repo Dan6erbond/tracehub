@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { JobPage } from '#/components/job-page'
 import { NotFound } from '#/components/not-found'
 import { jobQueryOptions } from '#/hooks/use-ci-jobs'
-import { useCurrentRepo } from '#/hooks/use-current-repo'
 import { createZodParams } from '#/lib/create-zod-params'
 import { ensureEntity } from '#/lib/ensure-entity'
 
@@ -18,6 +17,6 @@ export const Route = createFileRoute('/_app/repos/$repoId/jobs/$jobId')({
 })
 
 function Job() {
-  const { jobId } = Route.useParams()
-  return <JobPage repo={useCurrentRepo()} jobId={jobId} />
+  const { repoId, jobId } = Route.useParams()
+  return <JobPage repoId={repoId} jobId={jobId} />
 }

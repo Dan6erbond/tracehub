@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ciStatusSchema } from './ci-status'
-import { httpUrlSchema } from './url'
+import { httpUrlSchema, webPathSchema } from './url'
 
 /** A job as the Git host reports it; stored with `pipeline` resolved to a reference to the synced pipeline. */
 export const ciJobSchema = z.object({
@@ -14,6 +14,8 @@ export const ciJobSchema = z.object({
   pipeline: z.string().optional(),
   // Target of a commit status, which only the posting CI knows; check runs derive their page from the id.
   url: httpUrlSchema.optional(),
+  // The host's page for the job, for hosts whose job pages cannot be derived from the id.
+  webPath: webPathSchema.optional(),
   startedAt: z.number().optional(),
   completedAt: z.number().optional(),
 })

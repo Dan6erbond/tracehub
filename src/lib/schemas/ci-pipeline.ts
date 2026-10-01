@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ciStatusSchema } from './ci-status'
-import { httpUrlSchema } from './url'
+import { httpUrlSchema, webPathSchema } from './url'
 
 export const ciPipelineSchema = z.object({
   sha: z.string(),
@@ -15,6 +15,8 @@ export const ciPipelineSchema = z.object({
   trigger: z.string().optional(),
   // Page of a pipeline of CI outside the Git host, which only that CI knows; host pipelines derive theirs from the id.
   url: httpUrlSchema.optional(),
+  // The host's page for the pipeline, for hosts whose pipeline pages cannot be derived from the id.
+  webPath: webPathSchema.optional(),
   startedAt: z.number(),
   completedAt: z.number().optional(),
 })

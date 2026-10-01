@@ -8,7 +8,8 @@ import {
   SheetTitle,
 } from '#/components/ui/sheet'
 import { useTraceTarget } from '#/hooks/use-trace-target'
-import type { Doc, Id } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
+import type { RepoView } from '#/lib/schemas/host-links'
 import type { TraceTarget } from '#/hooks/use-trace-target'
 import type { TraceTargetSearch } from '#/lib/schemas/trace-target'
 
@@ -29,7 +30,7 @@ export function UploadTracesSheet({
   onClose,
   onCreated,
 }: {
-  repo: Doc<'repos'>
+  repo: RepoView
   search: TraceTargetSearch
   onClose: () => void
   onCreated: (runId: Id<'runs'>) => void

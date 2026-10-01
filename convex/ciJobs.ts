@@ -6,12 +6,14 @@ import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
 import schema from './schema'
 import { findInRepoQuery } from './lib/findInRepo'
+import { withJobLinks, withPipelineLinks } from './lib/hostLinks'
 import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
 import { insertAndGet, replaceOrInsert, uniqueBy } from './lib/upsert'
 import { ciJobSchema } from '../src/lib/schemas/ci-job'
 import { httpUrlSchema } from '../src/lib/schemas/url'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
+import type { CiPage, CommitLink } from '../src/lib/schemas/host-links'
 
 // Jobs are synced for the most recently active heads only, so a repo with thousands of branches keeps a bounded reload.
 const MAX_HEADS_PER_SOURCE = 100
@@ -22,7 +24,9 @@ const MAX_BRANCHES_SCANNED_FOR_HEADS = 1000
 // The host bounds the jobs of a commit or pipeline; listings returned to the frontend still stop here.
 const MAX_JOBS_PER_LIST = 200
 
-export type CiJobWithRunCount = Doc<'ciJobs'> & { runCount: number }
+export type CiJobWithRunCount = Doc<'ciJobs'> &
+  CiPage &
+  CommitLink & { runCount: number }
 export type CiJobListing = {
   jobs: Array<CiJobWithRunCount>
   // The host reported more jobs than the list holds.
@@ -405,10 +409,12 @@ export const pruneJobs = zInternalMutation({
 
 const withRunCounts = async (
   ctx: QueryCtx,
+  repo: Doc<'repos'>,
   jobs: Array<Doc<'ciJobs'>>,
+  pipeline?: Doc<'ciPipelines'>,
 ): Promise<CiJobListing> => ({
   jobs: await asyncMap(jobs.slice(0, MAX_JOBS_PER_LIST), async (job) => ({
-    ...job,
+    ...withJobLinks(repo, job, pipeline),
     runCount: await ctx.runQuery(internal.runs.countForJob, { jobId: job._id }),
   })),
   truncated: jobs.length > MAX_JOBS_PER_LIST,
@@ -422,7 +428,7 @@ export const listOtherChecks = repoQuery({
       internal.ciJobs.listAtSha,
       { repoId, sha, limit: MAX_JOBS_PER_LIST + 1, outsidePipelines: true },
     )
-    return withRunCounts(ctx, jobs)
+    return withRunCounts(ctx, ctx.repo, jobs)
   },
 })
 
@@ -439,7 +445,7 @@ export const listPipelineJobs = repoQuery({
       internal.ciJobs.listForPipeline,
       { pipelineId },
     )
-    return withRunCounts(ctx, jobs)
+    return withRunCounts(ctx, ctx.repo, jobs, pipeline)
   },
 })
 
@@ -450,7 +456,7 @@ export const getJob = repoQuery({
     { repoId, jobId },
   ): Promise<{
     job: CiJobWithRunCount
-    pipeline: Doc<'ciPipelines'> | null
+    pipeline: (Doc<'ciPipelines'> & CiPage & CommitLink) | null
   } | null> => {
     const job: Doc<'ciJobs'> | null = await ctx.runQuery(
       internal.ciJobs.findInRepo,
@@ -467,6 +473,9 @@ export const getJob = repoQuery({
     const runCount: number = await ctx.runQuery(internal.runs.countForJob, {
       jobId,
     })
-    return { job: { ...job, runCount }, pipeline }
+    return {
+      job: { ...withJobLinks(ctx.repo, job, pipeline), runCount },
+      pipeline: pipeline && withPipelineLinks(ctx.repo, pipeline),
+    }
   },
 })

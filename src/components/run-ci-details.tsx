@@ -1,16 +1,15 @@
 import { Link } from '@tanstack/react-router'
 import { CiStatusBadge } from '#/components/ci-status-badge'
 import { ExternalTextLink } from '#/components/external-text-link'
-import { jobUrl, pipelineUrl } from '#/lib/git-host'
 import type { RunDetail } from '../../convex/runs'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
 
 /** The pipeline and job a run came from: links to their pages here, with the host's CI pages beside them. */
 export function RunCiDetails({
-  repo,
+  repoId,
   run: { job, pipeline },
 }: {
-  repo: Doc<'repos'>
+  repoId: Id<'repos'>
   run: RunDetail
 }) {
   if (!job && !pipeline) return null
@@ -22,12 +21,12 @@ export function RunCiDetails({
           <span className="text-muted-foreground">Pipeline</span>
           <Link
             to="/repos/$repoId/pipelines/$pipelineId"
-            params={{ repoId: repo._id, pipelineId: pipeline._id }}
+            params={{ repoId, pipelineId: pipeline._id }}
             className="hover:underline"
           >
             {pipeline.name} #{pipeline.externalId}
           </Link>
-          <ExternalTextLink href={pipelineUrl(repo, pipeline)} />
+          <ExternalTextLink href={pipeline.url} />
         </span>
       )}
       {job && (
@@ -35,12 +34,12 @@ export function RunCiDetails({
           <span className="text-muted-foreground">Job</span>
           <Link
             to="/repos/$repoId/jobs/$jobId"
-            params={{ repoId: repo._id, jobId: job._id }}
+            params={{ repoId, jobId: job._id }}
             className="hover:underline"
           >
             {job.name}
           </Link>
-          <ExternalTextLink href={jobUrl(repo, job)} />
+          <ExternalTextLink href={job.url} />
           <CiStatusBadge status={job.status} />
         </span>
       )}

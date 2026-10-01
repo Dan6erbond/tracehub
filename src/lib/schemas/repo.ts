@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { httpUrlSchema } from './url'
 
 export const gitProviderSchema = z.enum(['github'])
 export type GitProvider = z.infer<typeof gitProviderSchema>
@@ -10,7 +11,7 @@ export const repoSchema = z.object({
   owner: z.string(),
   name: z.string(),
   private: z.boolean(),
-  htmlUrl: z.string(),
+  htmlUrl: httpUrlSchema,
   description: z.string().optional(),
   defaultBranch: z.string().optional(),
   pushedAt: z.number().optional(),

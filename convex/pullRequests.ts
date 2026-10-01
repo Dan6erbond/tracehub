@@ -3,9 +3,11 @@ import { asyncMap } from 'convex-helpers'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
 import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
+import { withPullRequestLinks } from './lib/hostLinks'
 import { replaceOrInsert, uniqueBy } from './lib/upsert'
 import { pullRequestSchema } from '../src/lib/schemas/pull-request'
 import type { Doc } from './_generated/dataModel'
+import type { PullRequestWithLinks } from './lib/hostLinks'
 
 export const listOpenForBranch = zInternalQuery({
   args: { repoId: zid('repos'), branchName: z.string() },
@@ -35,8 +37,16 @@ export const getByNumber = zInternalQuery({
 
 export const getPullRequest = repoQuery({
   args: { number: z.number() },
-  handler: (ctx, { repoId, number }): Promise<Doc<'pullRequests'> | null> =>
-    ctx.runQuery(internal.pullRequests.getByNumber, { repoId, number }),
+  handler: async (
+    ctx,
+    { repoId, number },
+  ): Promise<PullRequestWithLinks | null> => {
+    const pullRequest: Doc<'pullRequests'> | null = await ctx.runQuery(
+      internal.pullRequests.getByNumber,
+      { repoId, number },
+    )
+    return pullRequest && withPullRequestLinks(ctx.repo, pullRequest)
+  },
 })
 
 export const latestUpdatedAt = zInternalQuery({

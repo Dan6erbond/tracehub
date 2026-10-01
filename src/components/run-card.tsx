@@ -12,19 +12,10 @@ import {
   CardHeader,
   CardTitle,
 } from '#/components/ui/card'
-import { runCiUrl } from '#/lib/git-host'
 import { runName } from '#/lib/run-name'
 import type { RunDetail } from '../../convex/runs'
-import type { Repo } from '#/lib/schemas/repo'
 
-export function RunCard({
-  run,
-  repo,
-}: {
-  run: RunDetail
-  repo: Pick<Repo, 'provider' | 'htmlUrl'>
-}) {
-  const ciHref = runCiUrl(repo, run)
+export function RunCard({ run }: { run: RunDetail }) {
   return (
     <LinkCard>
       <CardHeader>
@@ -42,14 +33,14 @@ export function RunCard({
         </CardTitle>
         <CardDescription>
           <CommitTimestamp
-            repo={repo}
             sha={run.sha}
+            commitUrl={run.commitUrl}
             timestamp={run._creationTime}
           />
         </CardDescription>
-        {ciHref && (
+        {run.ciUrl && (
           <CardAction>
-            <ExternalTextLink href={ciHref} />
+            <ExternalTextLink href={run.ciUrl} />
           </CardAction>
         )}
       </CardHeader>

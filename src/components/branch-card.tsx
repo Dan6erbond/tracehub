@@ -11,24 +11,13 @@ import {
   CardHeader,
   CardTitle,
 } from '#/components/ui/card'
-import type { Id } from '../../convex/_generated/dataModel'
-import type { Branch } from '#/lib/schemas/branch'
-import type { Repo } from '#/lib/schemas/repo'
-import type { PullRequest } from '#/lib/schemas/pull-request'
-
-export type BranchWithPullRequests = Branch & {
-  repoId: Id<'repos'>
-  remoteDeletedAt?: number
-  pullRequests: Array<PullRequest>
-}
+import type { BranchWithDetails } from '../../convex/branches'
 
 export function BranchCard({
   branch,
-  repo,
   isDefault,
 }: {
-  branch: BranchWithPullRequests
-  repo: Pick<Repo, 'provider' | 'htmlUrl'>
+  branch: BranchWithDetails
   isDefault: boolean
 }) {
   return (
@@ -50,8 +39,8 @@ export function BranchCard({
         </CardTitle>
         <CardDescription>
           <CommitTimestamp
-            repo={repo}
             sha={branch.headSha}
+            commitUrl={branch.commitUrl}
             timestamp={branch.committedAt}
             dateOnly
           />

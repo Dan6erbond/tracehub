@@ -1,18 +1,18 @@
 import { PaginatedList } from '#/components/paginated-list'
 import { PipelineTable } from '#/components/pipeline-table'
 import { PIPELINES_PAGE_SIZE, usePipelines } from '#/hooks/use-ci-pipelines'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
 import type { RunScope } from '#/lib/schemas/run'
 
 /** Pipelines of a branch or pull request, or of the whole repo without a scope. */
 export function PipelineList({
-  repo,
+  repoId,
   scope,
 }: {
-  repo: Doc<'repos'>
+  repoId: Id<'repos'>
   scope?: RunScope
 }) {
-  const pipelines = usePipelines(repo._id, scope)
+  const pipelines = usePipelines(repoId, scope)
 
   return (
     <PaginatedList
@@ -24,7 +24,7 @@ export function PipelineList({
         </p>
       }
     >
-      {(results) => <PipelineTable repo={repo} pipelines={results} />}
+      {(results) => <PipelineTable repoId={repoId} pipelines={results} />}
     </PaginatedList>
   )
 }

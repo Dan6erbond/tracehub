@@ -14,17 +14,15 @@ import { Skeleton } from '#/components/ui/skeleton'
 import { usePipeline } from '#/hooks/use-ci-pipelines'
 import { usePipelineRuns } from '#/hooks/use-runs'
 import { formatElapsed } from '#/lib/format'
-import { pipelineUrl } from '#/lib/git-host'
-import type { Doc, Id } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
 
 export function PipelinePage({
-  repo,
+  repoId,
   pipelineId,
 }: {
-  repo: Doc<'repos'>
+  repoId: Id<'repos'>
   pipelineId: Id<'ciPipelines'>
 }) {
-  const repoId = repo._id
   const { pipeline, jobs, loadingJobs, loadJobsError } = usePipeline(
     repoId,
     pipelineId,
@@ -45,7 +43,7 @@ export function PipelinePage({
               #{pipeline.externalId}
             </span>
             <CiStatusBadge status={pipeline.status} />
-            <ExternalTextLink href={pipelineUrl(repo, pipeline)} />
+            <ExternalTextLink href={pipeline.url} />
           </>
         }
         meta={
@@ -60,8 +58,8 @@ export function PipelinePage({
               />
             )}
             <CommitTimestamp
-              repo={repo}
               sha={pipeline.sha}
+              commitUrl={pipeline.commitUrl}
               timestamp={pipeline.startedAt}
             />
             {pipeline.trigger && <span>{pipeline.trigger}</span>}
@@ -75,7 +73,7 @@ export function PipelinePage({
       {loadingJobs && <Skeleton className="h-24 w-full" />}
       {jobs.data && jobs.data.jobs.length > 0 && (
         <CiJobTable
-          repo={repo}
+          repoId={repoId}
           jobs={jobs.data.jobs}
           truncated={jobs.data.truncated}
         />
@@ -87,7 +85,7 @@ export function PipelinePage({
         <p className="text-muted-foreground">No jobs reported.</p>
       )}
       <SectionHeading>Trace runs</SectionHeading>
-      <RunList repo={repo} query={runs} />
+      <RunList query={runs} />
     </div>
   )
 }

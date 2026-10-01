@@ -10,9 +10,9 @@ import {
   TableHeader,
   TableRow,
 } from '#/components/ui/table'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { RepoView } from '#/lib/schemas/host-links'
 
-export function RepoList({ repos }: { repos: Array<Doc<'repos'>> }) {
+export function RepoList({ repos }: { repos: Array<RepoView> }) {
   return (
     <Table>
       <TableHeader>

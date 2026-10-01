@@ -5,15 +5,12 @@ import { SectionHeading } from '#/components/section-heading'
 import { RUNS_PAGE_SIZE } from '#/hooks/use-runs'
 import type { UsePaginatedQueryResult } from 'convex/react'
 import type { RunDetail } from '../../convex/runs'
-import type { Doc } from '../../convex/_generated/dataModel'
 
 /** Runs from a paginated query. With `pinnedFirst`, the query returns pinned runs first and they sit under their own heading. */
 export function RunList({
-  repo,
   query,
   pinnedFirst = false,
 }: {
-  repo: Doc<'repos'>
   query: UsePaginatedQueryResult<RunDetail>
   pinnedFirst?: boolean
 }) {
@@ -37,7 +34,7 @@ export function RunList({
                 All runs
               </SectionHeading>
             )}
-            <RunCard run={run} repo={repo} />
+            <RunCard run={run} />
           </Fragment>
         ))
       }}

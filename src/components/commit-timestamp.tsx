@@ -1,22 +1,21 @@
 import { CommitLink } from '#/components/commit-link'
 import { formatDate, formatDateTime } from '#/lib/format'
-import type { Repo } from '#/lib/schemas/repo'
 
 /** A commit followed by when it happened. */
 export function CommitTimestamp({
-  repo,
   sha,
+  commitUrl,
   timestamp,
   dateOnly,
 }: {
-  repo: Pick<Repo, 'provider' | 'htmlUrl'>
   sha: string
+  commitUrl: string
   timestamp?: number
   dateOnly?: boolean
 }) {
   return (
     <span>
-      <CommitLink repo={repo} sha={sha} />
+      <CommitLink sha={sha} commitUrl={commitUrl} />
       {timestamp !== undefined &&
         ` · ${(dateOnly ? formatDate : formatDateTime)(timestamp)}`}
     </span>

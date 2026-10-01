@@ -7,22 +7,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { UploadTracesButton } from '#/components/upload-traces-button'
 import { useScopeCounts } from '#/hooks/use-runs'
 import type { ComponentProps } from 'react'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
 import type { RunScope } from '#/lib/schemas/run'
 
 /** The pipelines and trace runs of a branch or pull request, each in its own tab. */
 export function ScopeActivity({
-  repo,
+  repoId,
   scope,
   headSha,
   uploadTarget,
 }: {
-  repo: Doc<'repos'>
+  repoId: Id<'repos'>
   scope: RunScope
   headSha?: string
   uploadTarget: ComponentProps<typeof UploadTracesButton>['target']
 }) {
-  const counts = useScopeCounts(repo._id, scope)
+  const counts = useScopeCounts(repoId, scope)
 
   return (
     <Tabs defaultValue="pipelines">
@@ -31,18 +31,18 @@ export function ScopeActivity({
           <TabsTrigger value="pipelines">Pipelines</TabsTrigger>
           <TabsTrigger value="runs">Trace runs</TabsTrigger>
         </TabsList>
-        <UploadTracesButton repoId={repo._id} target={uploadTarget} />
+        <UploadTracesButton repoId={repoId} target={uploadTarget} />
       </div>
       <TabsContent value="pipelines" className="flex flex-col gap-4">
-        {headSha && <CiJobList repo={repo} sha={headSha} />}
+        {headSha && <CiJobList repoId={repoId} sha={headSha} />}
         <div className="flex flex-col gap-3">
           <SectionHeading>Pipelines</SectionHeading>
-          <PipelineList repo={repo} scope={scope} />
+          <PipelineList repoId={repoId} scope={scope} />
         </div>
       </TabsContent>
       <TabsContent value="runs" className="flex flex-col gap-4">
         {counts.data && <TraceCountsBadges counts={counts.data} />}
-        <ScopeRunList repo={repo} scope={scope} />
+        <ScopeRunList repoId={repoId} scope={scope} />
       </TabsContent>
     </Tabs>
   )

@@ -15,6 +15,7 @@ import {
 } from './lib/functions'
 import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
 import { gitProviders } from './lib/gitProviders'
+import { withPipelineLinks } from './lib/hostLinks'
 import { scopedStream } from './lib/scopedStream'
 import { insertAndGet, replaceOrInsert, uniqueBy } from './lib/upsert'
 import { ciPipelineSchema } from '../src/lib/schemas/ci-pipeline'
@@ -24,10 +25,13 @@ import { httpUrlSchema } from '../src/lib/schemas/url'
 import type { TraceCounts } from '../src/lib/schemas/trace'
 import type { Doc } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
+import type { CiPage, CommitLink } from '../src/lib/schemas/host-links'
 
-export type PipelineWithCounts = Doc<'ciPipelines'> & {
-  traceCounts: TraceCounts
-}
+export type PipelineWithCounts = Doc<'ciPipelines'> &
+  CiPage &
+  CommitLink & {
+    traceCounts: TraceCounts
+  }
 
 export const findInRepo = findInRepoQuery('ciPipelines')
 
@@ -114,9 +118,10 @@ export const upsertPipelines = zInternalMutation({
 
 const withCounts = async (
   ctx: QueryCtx,
+  repo: Doc<'repos'>,
   pipeline: Doc<'ciPipelines'>,
 ): Promise<PipelineWithCounts> => ({
-  ...pipeline,
+  ...withPipelineLinks(repo, pipeline),
   traceCounts: await ctx.runQuery(internal.traceCounts.countPipelineTraces, {
     pipelineId: pipeline._id,
   }),
@@ -137,7 +142,7 @@ export const listPipelines = repoQuery({
       return pipelines
         .withIndex('by_repo_startedAt', (q) => q.eq('repoId', repoId))
         .order('desc')
-        .map((pipeline) => withCounts(ctx, pipeline))
+        .map((pipeline) => withCounts(ctx, ctx.repo, pipeline))
         .paginate(paginationOpts)
     const scoped = await scopedStream(
       ctx,
@@ -160,7 +165,7 @@ export const listPipelines = repoQuery({
       ['startedAt', '_creationTime'],
     )
     return scoped
-      .map((pipeline) => withCounts(ctx, pipeline))
+      .map((pipeline) => withCounts(ctx, ctx.repo, pipeline))
       .paginate(paginationOpts)
   },
 })
@@ -175,7 +180,7 @@ export const getPipeline = repoQuery({
       internal.ciPipelines.findInRepo,
       { repoId, id: pipelineId },
     )
-    return pipeline && withCounts(ctx, pipeline)
+    return pipeline && withCounts(ctx, ctx.repo, pipeline)
   },
 })
 

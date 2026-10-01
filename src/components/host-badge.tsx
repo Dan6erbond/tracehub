@@ -1,21 +1,20 @@
 import { ExternalLink } from 'lucide-react'
 import { Badge } from '#/components/ui/badge'
-import { hostLabel } from '#/lib/git-host'
-import type { Repo } from '#/lib/schemas/repo'
+import type { RepoView } from '#/lib/schemas/host-links'
 
 /** The Git host's name, as an external link to a page on the host when `href` is given. */
 export function HostBadge({
   repo,
   href,
 }: {
-  repo: Pick<Repo, 'provider' | 'htmlUrl'>
+  repo: Pick<RepoView, 'providerLabel'>
   href?: string
 }) {
-  if (!href) return <Badge variant="secondary">{hostLabel(repo)}</Badge>
+  if (!href) return <Badge variant="secondary">{repo.providerLabel}</Badge>
   return (
     <Badge asChild variant="outline">
       <a href={href} target="_blank" rel="noreferrer">
-        {hostLabel(repo)}
+        {repo.providerLabel}
         <ExternalLink />
       </a>
     </Badge>

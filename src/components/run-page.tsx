@@ -12,10 +12,9 @@ import { Button } from '#/components/ui/button'
 import { UploadTracesButton } from '#/components/upload-traces-button'
 import { useSetRunPinned, useRun } from '#/hooks/use-runs'
 import { TRACES_PAGE_SIZE, useTraces } from '#/hooks/use-traces'
-import { runCiUrl } from '#/lib/git-host'
 import { runName } from '#/lib/run-name'
 import type { RunDetail } from '../../convex/runs'
-import type { Doc, Id } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
 
 /** Leads back to the pull request or branch the run belongs to, taken from its pipeline when the run states neither, else to the branches. */
 function RunBackLink({
@@ -53,18 +52,16 @@ function RunBackLink({
 }
 
 export function RunPage({
-  repo,
+  repoId,
   runId,
 }: {
-  repo: Doc<'repos'>
+  repoId: Id<'repos'>
   runId: Id<'runs'>
 }) {
-  const repoId = repo._id
   const run = useRun(repoId, runId)
   const traces = useTraces(repoId, runId)
   const setPinned = useSetRunPinned()
   const pinned = run.pinnedAt !== undefined
-  const ciHref = runCiUrl(repo, run)
 
   return (
     <div className="flex flex-col gap-4">
@@ -83,19 +80,19 @@ export function RunPage({
             }
             meta={
               <CommitTimestamp
-                repo={repo}
                 sha={run.sha}
+                commitUrl={run.commitUrl}
                 timestamp={run._creationTime}
               />
             }
           />
-          <RunCiDetails repo={repo} run={run} />
+          <RunCiDetails repoId={repoId} run={run} />
           {run.description && <p>{run.description}</p>}
           <TraceCountsBadges counts={run.traceCounts} />
         </div>
         <div className="flex items-center gap-4">
-          {ciHref && (
-            <ExternalTextLink href={ciHref}>View in CI</ExternalTextLink>
+          {run.ciUrl && (
+            <ExternalTextLink href={run.ciUrl}>View in CI</ExternalTextLink>
           )}
           {run.prNumber !== undefined && (
             <Button

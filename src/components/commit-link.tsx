@@ -1,22 +1,20 @@
-import { commitUrl } from '#/lib/git-host'
 import { cn } from '#/lib/utils'
-import type { Repo } from '#/lib/schemas/repo'
 
 const SHORT_SHA_LENGTH = 7
 
 /** Short SHA linking to the commit on the Git host. */
 export function CommitLink({
-  repo,
   sha,
+  commitUrl,
   className,
 }: {
-  repo: Pick<Repo, 'provider' | 'htmlUrl'>
   sha: string
+  commitUrl: string
   className?: string
 }) {
   return (
     <a
-      href={commitUrl(repo, sha)}
+      href={commitUrl}
       target="_blank"
       rel="noreferrer"
       title={sha}

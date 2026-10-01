@@ -15,9 +15,11 @@ import { chunk } from './lib/chunk'
 import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
 import { gitProviders } from './lib/gitProviders'
 import { loadRepositories } from './lib/gitProviders/loadRepositories'
+import { withRepoLinks } from './lib/hostLinks'
 import { repoActivityAt } from './lib/repoActivity'
 import { replaceOrInsert, uniqueBy } from './lib/upsert'
 import { withReloadLock } from './lib/withReloadLock'
+import { repoViewSchema } from '../src/lib/schemas/host-links'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { gitProviderSchema, repoSchema } from '../src/lib/schemas/repo'
 import type { PullRequest } from '../src/lib/schemas/pull-request'
@@ -33,8 +35,10 @@ export const listRepos = authedQuery({
   args: { search: z.string().optional(), paginationOpts: paginationOptsSchema },
   handler: async (ctx, { search, paginationOpts }) => {
     const term = search?.trim()
-    const getRepoOfLink = (link: Doc<'userRepos'>) =>
-      ctx.db.get('repos', link.repoId)
+    const getRepoOfLink = async (link: Doc<'userRepos'>) => {
+      const repo = await ctx.db.get('repos', link.repoId)
+      return repo && withRepoLinks(repo)
+    }
     if (term) {
       // Streams can't wrap a search index; results are ordered by relevance, not by activity.
       const links = await ctx.db
@@ -252,6 +256,15 @@ export const getUserRepo = zInternalQuery({
 
 export const getRepo = authedQuery({
   args: { repoId: zid('repos') },
-  handler: (ctx, { repoId }): Promise<Doc<'repos'> | null> =>
-    ctx.runQuery(internal.repos.getUserRepo, { userId: ctx.userId, repoId }),
+  returns: repoViewSchema.nullable(),
+  handler: async (
+    ctx,
+    { repoId },
+  ): Promise<z.infer<typeof repoViewSchema> | null> => {
+    const repo: Doc<'repos'> | null = await ctx.runQuery(
+      internal.repos.getUserRepo,
+      { userId: ctx.userId, repoId },
+    )
+    return repo && withRepoLinks(repo)
+  },
 })

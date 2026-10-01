@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { RepoView } from '#/lib/schemas/host-links'
 
-const RepoContext = createContext<Doc<'repos'> | null>(null)
+const RepoContext = createContext<RepoView | null>(null)
 
 /** Provides the repo that the `/repos/$repoId` layout has already loaded to its child routes. */
 export const RepoProvider = RepoContext

@@ -12,9 +12,9 @@ import {
   useBranchesDefaultFirst,
   useInitialRepoSync,
 } from '#/hooks/use-branches'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { RepoView } from '#/lib/schemas/host-links'
 
-export function RepoBranchesPage({ repo }: { repo: Doc<'repos'> }) {
+export function RepoBranchesPage({ repo }: { repo: RepoView }) {
   const repoId = repo._id
   const [openPullRequestsOnly, setOpenPullRequestsOnly] = useState(true)
   const branches = useBranchesDefaultFirst(repo, openPullRequestsOnly)
@@ -58,7 +58,6 @@ export function RepoBranchesPage({ repo }: { repo: Doc<'repos'> }) {
               <BranchCard
                 key={branch._id}
                 branch={branch}
-                repo={repo}
                 isDefault={branch.name === repo.defaultBranch}
               />
             ))}

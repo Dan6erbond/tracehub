@@ -11,17 +11,16 @@ import {
   TableRow,
 } from '#/components/ui/table'
 import { formatElapsed } from '#/lib/format'
-import { jobUrl } from '#/lib/git-host'
 import type { CiJobWithRunCount } from '../../convex/ciJobs'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
 
 /** Jobs with their status, timing and number of uploaded trace runs; each opens its detail page, with the host's page beside it. */
 export function CiJobTable({
-  repo,
+  repoId,
   jobs,
   truncated = false,
 }: {
-  repo: Doc<'repos'>
+  repoId: Id<'repos'>
   jobs: Array<CiJobWithRunCount>
   truncated?: boolean
 }) {
@@ -43,12 +42,12 @@ export function CiJobTable({
                 <span className="flex items-center gap-2">
                   <StretchedLink
                     to="/repos/$repoId/jobs/$jobId"
-                    params={{ repoId: repo._id, jobId: job._id }}
+                    params={{ repoId, jobId: job._id }}
                     className="hover:underline"
                   >
                     {job.name}
                   </StretchedLink>
-                  <ExternalTextLink href={jobUrl(repo, job)} />
+                  <ExternalTextLink href={job.url} />
                 </span>
               </TableCell>
               <TableCell>

@@ -8,17 +8,15 @@ import { SectionHeading } from '#/components/section-heading'
 import { useJob } from '#/hooks/use-ci-jobs'
 import { useJobRuns } from '#/hooks/use-runs'
 import { formatElapsed } from '#/lib/format'
-import { jobUrl } from '#/lib/git-host'
-import type { Doc, Id } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
 
 export function JobPage({
-  repo,
+  repoId,
   jobId,
 }: {
-  repo: Doc<'repos'>
+  repoId: Id<'repos'>
   jobId: Id<'ciJobs'>
 }) {
-  const repoId = repo._id
   const { job, pipeline } = useJob(repoId, jobId)
   const runs = useJobRuns(repoId, jobId)
   const elapsed = formatElapsed(job.startedAt, job.completedAt)
@@ -42,14 +40,14 @@ export function JobPage({
         badges={
           <>
             <CiStatusBadge status={job.status} />
-            <ExternalTextLink href={jobUrl(repo, job)} />
+            <ExternalTextLink href={job.url} />
           </>
         }
         meta={
           <>
             <CommitTimestamp
-              repo={repo}
               sha={job.sha}
+              commitUrl={job.commitUrl}
               timestamp={job.startedAt}
             />
             {elapsed && <span>{elapsed}</span>}
@@ -57,7 +55,7 @@ export function JobPage({
         }
       />
       <SectionHeading>Trace runs ({job.runCount})</SectionHeading>
-      <RunList repo={repo} query={runs} />
+      <RunList query={runs} />
     </div>
   )
 }

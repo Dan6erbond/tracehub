@@ -14,16 +14,15 @@ import {
   TableRow,
 } from '#/components/ui/table'
 import { formatDateTime, formatElapsed } from '#/lib/format'
-import { pipelineUrl } from '#/lib/git-host'
 import type { PipelineWithCounts } from '../../convex/ciPipelines'
-import type { Doc } from '../../convex/_generated/dataModel'
+import type { Id } from '../../convex/_generated/dataModel'
 
 /** Pipelines newest first, each opening its detail page, with the host's page beside it. */
 export function PipelineTable({
-  repo,
+  repoId,
   pipelines,
 }: {
-  repo: Doc<'repos'>
+  repoId: Id<'repos'>
   pipelines: Array<PipelineWithCounts>
 }) {
   return (
@@ -46,7 +45,7 @@ export function PipelineTable({
               <span className="flex items-center gap-2">
                 <StretchedLink
                   to="/repos/$repoId/pipelines/$pipelineId"
-                  params={{ repoId: repo._id, pipelineId: pipeline._id }}
+                  params={{ repoId, pipelineId: pipeline._id }}
                   className="hover:underline"
                 >
                   {pipeline.name}
@@ -54,7 +53,7 @@ export function PipelineTable({
                 <span className="text-sm text-muted-foreground">
                   #{pipeline.externalId}
                 </span>
-                <ExternalTextLink href={pipelineUrl(repo, pipeline)} />
+                <ExternalTextLink href={pipeline.url} />
               </span>
             </TableCell>
             <TableCell>
@@ -62,13 +61,13 @@ export function PipelineTable({
             </TableCell>
             <TableCell>
               {pipeline.branch !== undefined ? (
-                <BranchBadge repoId={repo._id} name={pipeline.branch} />
+                <BranchBadge repoId={repoId} name={pipeline.branch} />
               ) : (
                 '-'
               )}
             </TableCell>
             <TableCell>
-              <CommitLink repo={repo} sha={pipeline.sha} />
+              <CommitLink sha={pipeline.sha} commitUrl={pipeline.commitUrl} />
             </TableCell>
             <TableCell>{formatDateTime(pipeline.startedAt)}</TableCell>
             <TableCell>

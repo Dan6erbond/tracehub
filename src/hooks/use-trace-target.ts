@@ -3,6 +3,7 @@ import { useOptionalPullRequest } from '#/hooks/use-pull-requests'
 import { useOptionalRun } from '#/hooks/use-runs'
 import { targetBranch } from '#/lib/schemas/trace-target'
 import type { Doc } from '../../convex/_generated/dataModel'
+import type { RepoView } from '#/lib/schemas/host-links'
 import type { TraceTargetSearch } from '#/lib/schemas/trace-target'
 
 export type TraceTarget =
@@ -15,7 +16,7 @@ export type TraceTarget =
  * The route loader guarantees a run or pull request exists; a branch that is not stored yet is a valid target without a head sha.
  */
 export function useTraceTarget(
-  repo: Doc<'repos'>,
+  repo: RepoView,
   search: TraceTargetSearch,
 ): TraceTarget | undefined {
   const { pull, job } = search

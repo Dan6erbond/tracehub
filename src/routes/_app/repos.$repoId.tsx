@@ -35,7 +35,7 @@ function RepoLayout() {
           description={repo.description}
         >
           <VisibilityBadge repo={repo} />
-          <HostBadge repo={repo} href={repo.htmlUrl} />
+          <HostBadge repo={repo} href={repo.url} />
         </PageTitle>
         <Outlet />
       </div>

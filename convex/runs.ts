@@ -8,6 +8,8 @@ import { internal } from './_generated/api'
 import schema from './schema'
 import { EMPTY_PAGE } from './lib/emptyPage'
 import { findInRepoQuery } from './lib/findInRepo'
+import { commitUrl } from './lib/gitProviders/urls'
+import { withJobLinks, withPipelineLinks } from './lib/hostLinks'
 import {
   repoMutation,
   repoQuery,
@@ -25,13 +27,20 @@ import {
 import type { ResolvedRunScope } from '../src/lib/schemas/run'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
+import type {
+  CiPage,
+  CommitLink,
+  RunCiLink,
+} from '../src/lib/schemas/host-links'
 import type { TraceCounts } from '../src/lib/schemas/trace'
 
 export type RunWithCounts = Doc<'runs'> & { traceCounts: TraceCounts }
-export type RunDetail = RunWithCounts & {
-  job: Doc<'ciJobs'> | null
-  pipeline: Doc<'ciPipelines'> | null
-}
+export type RunDetail = RunWithCounts &
+  CommitLink &
+  RunCiLink & {
+    job: (Doc<'ciJobs'> & CiPage & CommitLink) | null
+    pipeline: (Doc<'ciPipelines'> & CiPage & CommitLink) | null
+  }
 
 const withTraceCounts = async (
   ctx: QueryCtx,
@@ -47,6 +56,7 @@ const withTraceCounts = async (
 /** `jobs` and `pipelines` the caller already loaded are used instead of fetching them again for every run. */
 export const withRunDetails = async (
   ctx: QueryCtx,
+  repo: Doc<'repos'>,
   run: Doc<'runs'>,
   {
     jobs = [],
@@ -75,7 +85,15 @@ export const withRunDetails = async (
           id: pipelineId,
         })),
   ])
-  return { ...counted, job, pipeline }
+  const linkedJob = job && withJobLinks(repo, job, pipeline)
+  const linkedPipeline = pipeline && withPipelineLinks(repo, pipeline)
+  return {
+    ...counted,
+    commitUrl: commitUrl(repo, run.sha),
+    job: linkedJob,
+    pipeline: linkedPipeline,
+    ciUrl: linkedJob?.url ?? linkedPipeline?.url,
+  }
 }
 
 export const findInRepo = findInRepoQuery('runs')
@@ -112,7 +130,7 @@ export const getRun = repoQuery({
       internal.runs.findInRepo,
       { repoId, id: runId },
     )
-    return run && withRunDetails(ctx, run)
+    return run && withRunDetails(ctx, ctx.repo, run)
   },
 })
 
@@ -175,7 +193,7 @@ export const listRuns = repoQuery({
       PINNED_FIRST,
     )
     return scoped
-      .map((run) => withRunDetails(ctx, run))
+      .map((run) => withRunDetails(ctx, ctx.repo, run))
       .paginate(paginationOpts)
   },
 })
@@ -204,7 +222,7 @@ export const listJobRuns = repoQuery({
       .withIndex('by_job', (q) => q.eq('jobId', jobId))
       .order('desc')
       .map((run) =>
-        withRunDetails(ctx, run, {
+        withRunDetails(ctx, ctx.repo, run, {
           jobs: [job],
           pipelines: pipeline ? [pipeline] : [],
         }),
@@ -236,7 +254,9 @@ export const listPipelineRuns = repoQuery({
       .query('runs')
       .withIndex('by_pipeline', (q) => q.eq('pipelineId', pipelineId))
       .order('desc')
-      .map((run) => withRunDetails(ctx, run, { jobs, pipelines: [pipeline] }))
+      .map((run) =>
+        withRunDetails(ctx, ctx.repo, run, { jobs, pipelines: [pipeline] }),
+      )
       .paginate(paginationOpts)
   },
 })
