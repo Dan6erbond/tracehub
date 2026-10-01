@@ -1,6 +1,7 @@
 import { CiJobList } from '#/components/ci-job-list'
 import { PipelineList } from '#/components/pipeline-list'
 import { RunList } from '#/components/run-list'
+import { SectionHeading } from '#/components/section-heading'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { UploadTracesButton } from '#/components/upload-traces-button'
@@ -35,7 +36,7 @@ export function ScopeActivity({
       <TabsContent value="pipelines" className="flex flex-col gap-4">
         {headSha && <CiJobList repo={repo} sha={headSha} />}
         <div className="flex flex-col gap-3">
-          <h3 className="text-lg font-semibold">Pipelines</h3>
+          <SectionHeading>Pipelines</SectionHeading>
           <PipelineList repo={repo} scope={scope} />
         </div>
       </TabsContent>

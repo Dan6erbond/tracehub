@@ -17,20 +17,21 @@ export const useBranches = (
     { initialNumItems: BRANCHES_PAGE_SIZE },
   )
 
+export const useBranch = (repoId: Id<'repos'>, name?: string) =>
+  useQuery(
+    convexQuery(
+      api.branches.getBranch,
+      name === undefined ? 'skip' : { repoId, name },
+    ),
+  )
+
 /** Lists branches with the repo's default branch always pinned first, even when the open-pull-request filter would hide it. */
 export function useBranchesDefaultFirst(
   repo: Doc<'repos'>,
   openPullRequestsOnly: boolean,
 ) {
   const { results, ...rest } = useBranches(repo._id, openPullRequestsOnly)
-  const { data: defaultBranch } = useQuery(
-    convexQuery(
-      api.branches.getBranch,
-      repo.defaultBranch
-        ? { repoId: repo._id, name: repo.defaultBranch }
-        : 'skip',
-    ),
-  )
+  const { data: defaultBranch } = useBranch(repo._id, repo.defaultBranch)
   const pinned = defaultBranch ? [defaultBranch] : []
   return {
     ...rest,

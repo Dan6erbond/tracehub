@@ -1,10 +1,10 @@
-import { Link } from '@tanstack/react-router'
 import { CiStatusBadge } from '#/components/ci-status-badge'
-import { CommitLink } from '#/components/commit-link'
+import { LinkCard } from '#/components/card-link'
+import { CommitTimestamp } from '#/components/commit-timestamp'
 import { PullRequestBadge } from '#/components/pull-request-badge'
+import { StretchedLink } from '#/components/stretched-link'
 import { Badge } from '#/components/ui/badge'
 import {
-  Card,
   CardAction,
   CardContent,
   CardDescription,
@@ -32,25 +32,29 @@ export function BranchCard({
   isDefault: boolean
 }) {
   return (
-    <Card className="relative transition-colors hover:bg-accent/50">
+    <LinkCard>
       <CardHeader>
         <CardTitle className="flex min-w-0 items-center gap-2 font-mono text-sm">
-          <Link
+          <StretchedLink
             to="/repos/$repoId/branches/$"
             params={{ repoId: branch.repoId, _splat: branch.name }}
             title={branch.name}
-            className="min-w-0 truncate after:absolute after:inset-0"
+            className="min-w-0 truncate"
           >
             {branch.name}
-          </Link>
+          </StretchedLink>
           {isDefault && <Badge variant="secondary">default</Badge>}
           {branch.remoteDeletedAt !== undefined && (
             <Badge variant="outline">deleted on remote</Badge>
           )}
         </CardTitle>
         <CardDescription>
-          <CommitLink repo={repo} sha={branch.headSha} /> ·{' '}
-          {new Date(branch.committedAt).toLocaleDateString()}
+          <CommitTimestamp
+            repo={repo}
+            sha={branch.headSha}
+            timestamp={branch.committedAt}
+            dateOnly
+          />
         </CardDescription>
         {branch.ciStatus && (
           <CardAction>
@@ -69,6 +73,6 @@ export function BranchCard({
           ))}
         </CardContent>
       )}
-    </Card>
+    </LinkCard>
   )
 }

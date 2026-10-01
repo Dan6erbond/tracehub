@@ -1,29 +1,57 @@
-import { Link } from '@tanstack/react-router'
-import {
-  ChevronLeft,
-  ExternalLink,
-  GitPullRequest,
-  Pin,
-  PinOff,
-} from 'lucide-react'
+import { Pin, PinOff } from 'lucide-react'
+import { BackLink } from '#/components/back-link'
+import { CommitTimestamp } from '#/components/commit-timestamp'
+import { ExternalTextLink } from '#/components/external-text-link'
+import { PageHeader } from '#/components/page-header'
+import { PaginatedList } from '#/components/paginated-list'
+import { PullRequestBadge } from '#/components/pull-request-badge'
+import { QueryState } from '#/components/query-state'
 import { RunCiDetails } from '#/components/run-ci-details'
-import { CommitLink } from '#/components/commit-link'
-import { InfiniteScrollTrigger } from '#/components/infinite-scroll-trigger'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
 import { TraceTable } from '#/components/trace-table'
-import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
-import { Skeleton } from '#/components/ui/skeleton'
 import { UploadTracesButton } from '#/components/upload-traces-button'
-import {
-  TRACES_PAGE_SIZE,
-  useRun,
-  useSetRunPinned,
-  useTraces,
-} from '#/hooks/use-runs'
+import { useRun, useSetRunPinned } from '#/hooks/use-runs'
+import { TRACES_PAGE_SIZE, useTraces } from '#/hooks/use-traces'
 import { runCiUrl } from '#/lib/git-host'
 import { runName } from '#/lib/run-name'
+import type { RunDetail } from '../../convex/runs'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
+
+/** Leads back to the pull request or branch the run belongs to, taken from its pipeline when the run states neither, else to the branches. */
+function RunBackLink({
+  repoId,
+  run: { prNumber: runPrNumber, branch: runBranch, pipeline },
+}: {
+  repoId: Id<'repos'>
+  run: Pick<RunDetail, 'prNumber' | 'branch' | 'pipeline'>
+}) {
+  const prNumber = runPrNumber ?? pipeline?.prNumber
+  const branch = runBranch ?? pipeline?.branch
+  if (prNumber !== undefined)
+    return (
+      <BackLink
+        to="/repos/$repoId/pulls/$number"
+        params={{ repoId, number: prNumber }}
+      >
+        Pull request #{prNumber}
+      </BackLink>
+    )
+  if (branch !== undefined)
+    return (
+      <BackLink
+        to="/repos/$repoId/branches/$"
+        params={{ repoId, _splat: branch }}
+      >
+        {branch}
+      </BackLink>
+    )
+  return (
+    <BackLink to="/repos/$repoId" params={{ repoId }}>
+      Branches
+    </BackLink>
+  )
+}
 
 export function RunPage({
   repo,
@@ -33,94 +61,83 @@ export function RunPage({
   runId: Id<'runs'>
 }) {
   const repoId = repo._id
-  const run = useRun(repoId, runId)
+  const runQuery = useRun(repoId, runId)
   const traces = useTraces(repoId, runId)
   const setPinned = useSetRunPinned()
-  const pinned = run.data?.pinnedAt !== undefined
-  const ciHref = run.data && runCiUrl(repo, run.data)
+  const pinned = runQuery.data?.pinnedAt !== undefined
 
   return (
     <div className="flex flex-col gap-4">
-      <Link
-        to="/repos/$repoId"
-        params={{ repoId }}
-        className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="size-4" />
-        Branches
-      </Link>
-      {run.isPending && <Skeleton className="h-10 w-64" />}
-      {run.data === null && (
-        <p className="text-muted-foreground">Run not found.</p>
-      )}
-      {run.data && (
-        <>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-semibold">{runName(run.data)}</h2>
-                {run.data.prNumber !== undefined && (
-                  <Badge asChild variant="outline">
-                    <Link
-                      to="/repos/$repoId/pulls/$number"
-                      params={{ repoId, number: run.data.prNumber }}
-                    >
-                      <GitPullRequest />#{run.data.prNumber}
-                    </Link>
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                <CommitLink repo={repo} sha={run.data.sha} /> ·{' '}
-                {new Date(run.data._creationTime).toLocaleString()}
-              </p>
-              <RunCiDetails repo={repo} run={run.data} />
-              {run.data.description && <p>{run.data.description}</p>}
-              <TraceCountsBadges counts={run.data.traceCounts} />
-            </div>
-            <div className="flex gap-2">
-              {ciHref && (
-                <Button asChild variant="outline">
-                  <a href={ciHref} target="_blank" rel="noreferrer">
-                    <ExternalLink />
-                    View in CI
-                  </a>
-                </Button>
-              )}
-              {run.data.prNumber !== undefined && (
-                <Button
-                  variant="outline"
-                  disabled={setPinned.isPending}
-                  onClick={() =>
-                    setPinned.mutate({
-                      repoId,
-                      runId,
-                      pinned: !pinned,
-                    })
-                  }
-                >
-                  {pinned ? <PinOff /> : <Pin />}
-                  {pinned ? 'Unpin' : 'Pin'}
-                </Button>
-              )}
-              <UploadTracesButton repoId={repoId} target={{ job: runId }} />
-            </div>
-          </div>
-          {traces.status === 'LoadingFirstPage' && (
-            <Skeleton className="h-32 w-full" />
-          )}
-          {traces.results.length > 0 && (
+      <QueryState query={runQuery} notFound="Run not found.">
+        {(run) => {
+          const ciHref = runCiUrl(repo, run)
+          return (
             <>
-              <TraceTable traces={traces.results} />
-              <InfiniteScrollTrigger
-                canLoadMore={traces.status === 'CanLoadMore'}
-                isLoading={traces.status === 'LoadingMore'}
-                onLoadMore={() => traces.loadMore(TRACES_PAGE_SIZE)}
-              />
+              <RunBackLink repoId={repoId} run={run} />
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex flex-col gap-2">
+                  <PageHeader
+                    title={runName(run)}
+                    badges={
+                      run.prNumber !== undefined && (
+                        <PullRequestBadge
+                          pullRequest={{ number: run.prNumber }}
+                          repoId={repoId}
+                        />
+                      )
+                    }
+                    meta={
+                      <CommitTimestamp
+                        repo={repo}
+                        sha={run.sha}
+                        timestamp={run._creationTime}
+                      />
+                    }
+                  />
+                  <RunCiDetails repo={repo} run={run} />
+                  {run.description && <p>{run.description}</p>}
+                  <TraceCountsBadges counts={run.traceCounts} />
+                </div>
+                <div className="flex items-center gap-4">
+                  {ciHref && (
+                    <ExternalTextLink href={ciHref}>
+                      View in CI
+                    </ExternalTextLink>
+                  )}
+                  {run.prNumber !== undefined && (
+                    <Button
+                      variant="outline"
+                      disabled={setPinned.isPending}
+                      onClick={() =>
+                        setPinned.mutate({
+                          repoId,
+                          runId,
+                          pinned: !pinned,
+                        })
+                      }
+                    >
+                      {pinned ? <PinOff /> : <Pin />}
+                      {pinned ? 'Unpin' : 'Pin'}
+                    </Button>
+                  )}
+                  <UploadTracesButton repoId={repoId} target={{ job: runId }} />
+                </div>
+              </div>
+              <PaginatedList
+                query={traces}
+                pageSize={TRACES_PAGE_SIZE}
+                empty={
+                  <p className="text-muted-foreground">
+                    No traces in this run.
+                  </p>
+                }
+              >
+                {(results) => <TraceTable traces={results} />}
+              </PaginatedList>
             </>
-          )}
-        </>
-      )}
+          )
+        }}
+      </QueryState>
     </div>
   )
 }

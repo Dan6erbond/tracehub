@@ -4,7 +4,7 @@ import type { Repo } from '#/lib/schemas/repo'
 
 const SHORT_SHA_LENGTH = 7
 
-/** Short SHA linking to the commit on the Git host. Sits above stretched card links. */
+/** Short SHA linking to the commit on the Git host. */
 export function CommitLink({
   repo,
   sha,
@@ -20,7 +20,7 @@ export function CommitLink({
       target="_blank"
       rel="noreferrer"
       title={sha}
-      className={cn('relative z-10 font-mono hover:underline', className)}
+      className={cn('font-mono hover:underline', className)}
     >
       {sha.slice(0, SHORT_SHA_LENGTH)}
     </a>

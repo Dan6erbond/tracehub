@@ -1,4 +1,5 @@
 import { CiJobTable } from '#/components/ci-job-table'
+import { SectionHeading } from '#/components/section-heading'
 import { Skeleton } from '#/components/ui/skeleton'
 import { useCiJobs } from '#/hooks/use-ci-jobs'
 import type { Doc } from '../../convex/_generated/dataModel'
@@ -13,7 +14,7 @@ export function CiJobList({ repo, sha }: { repo: Doc<'repos'>; sha: string }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="text-lg font-semibold">Other checks</h3>
+      <SectionHeading>Other checks</SectionHeading>
       <CiJobTable repo={repo} jobs={checks} />
     </div>
   )

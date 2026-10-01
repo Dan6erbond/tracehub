@@ -1,14 +1,12 @@
-import { Link } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
-import { ChevronLeft } from 'lucide-react'
-import { api } from '../../convex/_generated/api'
+import { BackLink } from '#/components/back-link'
 import { CiStatusBadge } from '#/components/ci-status-badge'
-import { CommitLink } from '#/components/commit-link'
+import { CommitTimestamp } from '#/components/commit-timestamp'
 import { HostBadge } from '#/components/host-badge'
+import { PageHeader } from '#/components/page-header'
 import { PullRequestBadge } from '#/components/pull-request-badge'
+import { QueryState } from '#/components/query-state'
 import { ScopeActivity } from '#/components/scope-activity'
-import { Skeleton } from '#/components/ui/skeleton'
+import { useBranch } from '#/hooks/use-branches'
 import { branchUrl } from '#/lib/git-host'
 import type { Doc } from '../../convex/_generated/dataModel'
 
@@ -20,58 +18,55 @@ export function BranchPage({
   name: string
 }) {
   const repoId = repo._id
-  const branch = useQuery(convexQuery(api.branches.getBranch, { repoId, name }))
+  const branchQuery = useBranch(repoId, name)
 
   return (
     <div className="flex flex-col gap-4">
-      <Link
-        to="/repos/$repoId"
-        params={{ repoId }}
-        className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="size-4" />
+      <BackLink to="/repos/$repoId" params={{ repoId }}>
         Branches
-      </Link>
-      {branch.isPending && <Skeleton className="h-10 w-64" />}
-      {branch.data === null && (
-        <p className="text-muted-foreground">Branch not found.</p>
-      )}
-      {branch.data && (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-mono text-xl font-semibold break-all">
-              {branch.data.name}
-            </h2>
-            {branch.data.ciStatus && (
-              <CiStatusBadge status={branch.data.ciStatus} />
-            )}
-            <HostBadge repo={repo} href={branchUrl(repo, branch.data.name)} />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            <CommitLink repo={repo} sha={branch.data.headSha} /> ·{' '}
-            {new Date(branch.data.committedAt).toLocaleString()}
-          </p>
-          {branch.data.pullRequests.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {branch.data.pullRequests.map((pullRequest) => (
-                <PullRequestBadge
-                  key={pullRequest.number}
-                  pullRequest={pullRequest}
-                  repoId={repoId}
+      </BackLink>
+      <QueryState query={branchQuery} notFound="Branch not found.">
+        {(branch) => (
+          <>
+            <PageHeader
+              title={<span className="font-mono break-all">{branch.name}</span>}
+              badges={
+                <>
+                  {branch.ciStatus && (
+                    <CiStatusBadge status={branch.ciStatus} />
+                  )}
+                  <HostBadge repo={repo} href={branchUrl(repo, branch.name)} />
+                </>
+              }
+              meta={
+                <CommitTimestamp
+                  repo={repo}
+                  sha={branch.headSha}
+                  timestamp={branch.committedAt}
                 />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      {branch.data && (
-        <ScopeActivity
-          repo={repo}
-          scope={{ kind: 'branch', branch: name }}
-          headSha={branch.data.headSha}
-          uploadTarget={{ branch: name }}
-        />
-      )}
+              }
+            >
+              {branch.pullRequests.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {branch.pullRequests.map((pullRequest) => (
+                    <PullRequestBadge
+                      key={pullRequest.number}
+                      pullRequest={pullRequest}
+                      repoId={repoId}
+                    />
+                  ))}
+                </div>
+              )}
+            </PageHeader>
+            <ScopeActivity
+              repo={repo}
+              scope={{ kind: 'branch', branch: name }}
+              headSha={branch.headSha}
+              uploadTarget={{ branch: name }}
+            />
+          </>
+        )}
+      </QueryState>
     </div>
   )
 }

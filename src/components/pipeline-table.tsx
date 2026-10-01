@@ -2,7 +2,8 @@ import { BranchBadge } from '#/components/branch-badge'
 import { CiStatusBadge } from '#/components/ci-status-badge'
 import { CommitLink } from '#/components/commit-link'
 import { ExternalTextLink } from '#/components/external-text-link'
-import { LinkRow, RowLink } from '#/components/row-link'
+import { LinkRow } from '#/components/row-link'
+import { StretchedLink } from '#/components/stretched-link'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
 import {
   Table,
@@ -12,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '#/components/ui/table'
-import { formatDuration } from '#/lib/format'
+import { formatDateTime, formatElapsed } from '#/lib/format'
 import { pipelineUrl } from '#/lib/git-host'
 import type { PipelineWithCounts } from '../../convex/ciPipelines'
 import type { Doc } from '../../convex/_generated/dataModel'
@@ -43,13 +44,13 @@ export function PipelineTable({
           <LinkRow key={pipeline._id}>
             <TableCell>
               <span className="flex items-center gap-2">
-                <RowLink
+                <StretchedLink
                   to="/repos/$repoId/pipelines/$pipelineId"
                   params={{ repoId: repo._id, pipelineId: pipeline._id }}
                   className="hover:underline"
                 >
                   {pipeline.name}
-                </RowLink>
+                </StretchedLink>
                 <span className="text-sm text-muted-foreground">
                   #{pipeline.externalId}
                 </span>
@@ -69,13 +70,9 @@ export function PipelineTable({
             <TableCell>
               <CommitLink repo={repo} sha={pipeline.sha} />
             </TableCell>
+            <TableCell>{formatDateTime(pipeline.startedAt)}</TableCell>
             <TableCell>
-              {new Date(pipeline.startedAt).toLocaleString()}
-            </TableCell>
-            <TableCell>
-              {pipeline.completedAt !== undefined
-                ? formatDuration(pipeline.completedAt - pipeline.startedAt)
-                : '-'}
+              {formatElapsed(pipeline.startedAt, pipeline.completedAt) ?? '-'}
             </TableCell>
             <TableCell>
               <TraceCountsBadges counts={pipeline.traceCounts} />

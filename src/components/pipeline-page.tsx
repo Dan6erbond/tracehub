@@ -1,16 +1,19 @@
-import { Link } from '@tanstack/react-router'
-import { ChevronLeft, GitPullRequest } from 'lucide-react'
+import { BackLink } from '#/components/back-link'
 import { BranchBadge } from '#/components/branch-badge'
 import { CiJobTable } from '#/components/ci-job-table'
 import { CiStatusBadge } from '#/components/ci-status-badge'
-import { CommitLink } from '#/components/commit-link'
+import { CommitTimestamp } from '#/components/commit-timestamp'
+import { ErrorAlert } from '#/components/error-alert'
 import { ExternalTextLink } from '#/components/external-text-link'
+import { PageHeader } from '#/components/page-header'
+import { PullRequestBadge } from '#/components/pull-request-badge'
+import { QueryState } from '#/components/query-state'
 import { RunCard } from '#/components/run-card'
+import { SectionHeading } from '#/components/section-heading'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
-import { Badge } from '#/components/ui/badge'
 import { Skeleton } from '#/components/ui/skeleton'
 import { usePipeline } from '#/hooks/use-ci-pipelines'
-import { formatDuration } from '#/lib/format'
+import { formatElapsed } from '#/lib/format'
 import { pipelineUrl } from '#/lib/git-host'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 
@@ -22,88 +25,82 @@ export function PipelinePage({
   pipelineId: Id<'ciPipelines'>
 }) {
   const repoId = repo._id
-  const { pipeline, loadingJobs, loadJobsError } = usePipeline(
-    repoId,
-    pipelineId,
-  )
+  const {
+    pipeline: pipelineQuery,
+    loadingJobs,
+    loadJobsError,
+  } = usePipeline(repoId, pipelineId)
 
   return (
     <div className="flex flex-col gap-4">
-      <Link
-        to="/repos/$repoId/pipelines"
-        params={{ repoId }}
-        className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="size-4" />
+      <BackLink to="/repos/$repoId/pipelines" params={{ repoId }}>
         Pipelines
-      </Link>
-      {pipeline.isPending && <Skeleton className="h-10 w-64" />}
-      {pipeline.data === null && (
-        <p className="text-muted-foreground">Pipeline not found.</p>
-      )}
-      {pipeline.data && (
-        <>
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold">{pipeline.data.name}</h2>
-              <span className="text-muted-foreground">
-                #{pipeline.data.externalId}
-              </span>
-              <CiStatusBadge status={pipeline.data.status} />
-              <ExternalTextLink href={pipelineUrl(repo, pipeline.data)} />
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              {pipeline.data.branch !== undefined && (
-                <BranchBadge repoId={repoId} name={pipeline.data.branch} />
+      </BackLink>
+      <QueryState query={pipelineQuery} notFound="Pipeline not found.">
+        {(pipeline) => {
+          const elapsed = formatElapsed(
+            pipeline.startedAt,
+            pipeline.completedAt,
+          )
+          return (
+            <>
+              <PageHeader
+                title={pipeline.name}
+                badges={
+                  <>
+                    <span className="text-muted-foreground">
+                      #{pipeline.externalId}
+                    </span>
+                    <CiStatusBadge status={pipeline.status} />
+                    <ExternalTextLink href={pipelineUrl(repo, pipeline)} />
+                  </>
+                }
+                meta={
+                  <>
+                    {pipeline.branch !== undefined && (
+                      <BranchBadge repoId={repoId} name={pipeline.branch} />
+                    )}
+                    {pipeline.prNumber !== undefined && (
+                      <PullRequestBadge
+                        pullRequest={{ number: pipeline.prNumber }}
+                        repoId={repoId}
+                      />
+                    )}
+                    <CommitTimestamp
+                      repo={repo}
+                      sha={pipeline.sha}
+                      timestamp={pipeline.startedAt}
+                    />
+                    {pipeline.trigger && <span>{pipeline.trigger}</span>}
+                    {elapsed && <span>{elapsed}</span>}
+                  </>
+                }
+              >
+                <TraceCountsBadges counts={pipeline.traceCounts} />
+              </PageHeader>
+              <SectionHeading>Jobs</SectionHeading>
+              {loadingJobs && <Skeleton className="h-24 w-full" />}
+              {pipeline.jobs.length > 0 && (
+                <CiJobTable repo={repo} jobs={pipeline.jobs} />
               )}
-              {pipeline.data.prNumber !== undefined && (
-                <Badge asChild variant="outline">
-                  <Link
-                    to="/repos/$repoId/pulls/$number"
-                    params={{ repoId, number: pipeline.data.prNumber }}
-                  >
-                    <GitPullRequest />#{pipeline.data.prNumber}
-                  </Link>
-                </Badge>
+              <ErrorAlert error={loadJobsError}>
+                Could not load the jobs from the Git host.
+              </ErrorAlert>
+              {!loadingJobs && !loadJobsError && pipeline.jobs.length === 0 && (
+                <p className="text-muted-foreground">No jobs reported.</p>
               )}
-              <CommitLink repo={repo} sha={pipeline.data.sha} />
-              {pipeline.data.trigger && <span>{pipeline.data.trigger}</span>}
-              <span>{new Date(pipeline.data.startedAt).toLocaleString()}</span>
-              {pipeline.data.completedAt !== undefined && (
-                <span>
-                  {formatDuration(
-                    pipeline.data.completedAt - pipeline.data.startedAt,
-                  )}
-                </span>
+              {pipeline.unlinkedRuns.length > 0 && (
+                <div className="flex flex-col gap-3">
+                  <SectionHeading>Other trace runs</SectionHeading>
+                  {pipeline.unlinkedRuns.map((run) => (
+                    <RunCard key={run._id} run={run} repo={repo} />
+                  ))}
+                </div>
               )}
-            </div>
-            <TraceCountsBadges counts={pipeline.data.traceCounts} />
-          </div>
-          <h3 className="text-lg font-semibold">Jobs</h3>
-          {loadingJobs && <Skeleton className="h-24 w-full" />}
-          {pipeline.data.jobs.length > 0 && (
-            <CiJobTable repo={repo} jobs={pipeline.data.jobs} />
-          )}
-          {loadJobsError && (
-            <p className="text-destructive-foreground">
-              Could not load the jobs from the Git host.
-            </p>
-          )}
-          {!loadingJobs &&
-            !loadJobsError &&
-            pipeline.data.jobs.length === 0 && (
-              <p className="text-muted-foreground">No jobs reported.</p>
-            )}
-          {pipeline.data.unlinkedRuns.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h3 className="text-lg font-semibold">Other trace runs</h3>
-              {pipeline.data.unlinkedRuns.map((run) => (
-                <RunCard key={run._id} run={run} repo={repo} />
-              ))}
-            </div>
-          )}
-        </>
-      )}
+            </>
+          )
+        }}
+      </QueryState>
     </div>
   )
 }

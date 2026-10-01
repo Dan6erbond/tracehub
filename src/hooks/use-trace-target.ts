@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
-import { api } from '../../convex/_generated/api'
-import type { Doc, Id } from '../../convex/_generated/dataModel'
+import { useBranch } from '#/hooks/use-branches'
+import { usePullRequest } from '#/hooks/use-pull-requests'
+import { useRun } from '#/hooks/use-runs'
+import type { Doc } from '../../convex/_generated/dataModel'
 import type { TraceTargetSearch } from '#/lib/schemas/trace-target'
 
 export type TraceTarget =
@@ -14,23 +14,10 @@ export function useTraceTarget(
   repo: Doc<'repos'>,
   { branch, pull, job }: TraceTargetSearch,
 ): TraceTarget | null | undefined {
-  const repoId: Id<'repos'> = repo._id
   const branchName = branch ?? repo.defaultBranch ?? ''
-  const run = useQuery(
-    convexQuery(api.runs.getRun, job ? { repoId, runId: job } : 'skip'),
-  )
-  const pullRequest = useQuery(
-    convexQuery(
-      api.pullRequests.getPullRequest,
-      !job && pull ? { repoId, number: pull } : 'skip',
-    ),
-  )
-  const branchDoc = useQuery(
-    convexQuery(
-      api.branches.getBranch,
-      !job && !pull ? { repoId, name: branchName } : 'skip',
-    ),
-  )
+  const run = useRun(repo._id, job)
+  const pullRequest = usePullRequest(repo._id, job ? undefined : pull)
+  const branchDoc = useBranch(repo._id, job || pull ? undefined : branchName)
 
   if (job)
     return run.isPending

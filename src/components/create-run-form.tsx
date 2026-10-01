@@ -1,5 +1,6 @@
 import { createRunFormOptions } from '#/components/form/create-run-form-options'
 import { useAppForm } from '#/components/form/use-app-form'
+import { ErrorAlert } from '#/components/error-alert'
 import { TraceUploadList } from '#/components/trace-upload-list'
 import { FieldGroup, FieldLegend, FieldSet } from '#/components/ui/field'
 import { useSubmitTraces } from '#/hooks/use-submit-traces'
@@ -103,9 +104,7 @@ export function CreateRunForm({
         )}
       </FieldGroup>
       <TraceUploadList form={form} progress={progress} />
-      {submit.isError && (
-        <p className="text-sm text-destructive">{submit.error.message}</p>
-      )}
+      <ErrorAlert error={submit.error} />
       <form.AppForm>
         <form.SubmitButton>Upload traces</form.SubmitButton>
       </form.AppForm>

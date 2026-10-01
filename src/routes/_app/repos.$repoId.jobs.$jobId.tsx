@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { zid } from 'convex-helpers/server/zod4'
 import { z } from 'zod'
 import { JobPage } from '#/components/job-page'
-import { useRepo } from '#/hooks/use-repos'
+import { useCurrentRepo } from '#/hooks/use-current-repo'
 import { createZodParams } from '#/lib/create-zod-params'
 
 export const Route = createFileRoute('/_app/repos/$repoId/jobs/$jobId')({
@@ -11,7 +11,6 @@ export const Route = createFileRoute('/_app/repos/$repoId/jobs/$jobId')({
 })
 
 function Job() {
-  const { repoId, jobId } = Route.useParams()
-  const repo = useRepo(repoId)
-  return repo.data ? <JobPage repo={repo.data} jobId={jobId} /> : null
+  const { jobId } = Route.useParams()
+  return <JobPage repo={useCurrentRepo()} jobId={jobId} />
 }

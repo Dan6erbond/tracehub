@@ -2,8 +2,10 @@ import { Link, Outlet, createFileRoute } from '@tanstack/react-router'
 import { zid } from 'convex-helpers/server/zod4'
 import { z } from 'zod'
 import { HostBadge } from '#/components/host-badge'
-import { Skeleton } from '#/components/ui/skeleton'
+import { PageTitle } from '#/components/page-title'
+import { QueryState } from '#/components/query-state'
 import { VisibilityBadge } from '#/components/visibility-badge'
+import { RepoProvider } from '#/hooks/use-current-repo'
 import { useRepo } from '#/hooks/use-repos'
 import { createZodParams } from '#/lib/create-zod-params'
 
@@ -14,29 +16,28 @@ export const Route = createFileRoute('/_app/repos/$repoId')({
 
 function RepoLayout() {
   const { repoId } = Route.useParams()
-  const repo = useRepo(repoId)
-
-  if (repo.isPending) return <Skeleton className="h-10 w-64" />
-  if (!repo.data)
-    return <p className="text-muted-foreground">Repository not found.</p>
+  const repoQuery = useRepo(repoId)
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold">
-            <Link to="/repos/$repoId" params={{ repoId }}>
-              {repo.data.fullName}
-            </Link>
-          </h1>
-          <VisibilityBadge repo={repo.data} />
-          <HostBadge repo={repo.data} href={repo.data.htmlUrl} />
-        </div>
-        {repo.data.description && (
-          <p className="text-muted-foreground">{repo.data.description}</p>
-        )}
-      </div>
-      <Outlet />
-    </div>
+    <QueryState query={repoQuery} notFound="Repository not found.">
+      {(repo) => (
+        <RepoProvider value={repo}>
+          <div className="flex flex-1 flex-col gap-4">
+            <PageTitle
+              title={
+                <Link to="/repos/$repoId" params={{ repoId }}>
+                  {repo.fullName}
+                </Link>
+              }
+              description={repo.description}
+            >
+              <VisibilityBadge repo={repo} />
+              <HostBadge repo={repo} href={repo.htmlUrl} />
+            </PageTitle>
+            <Outlet />
+          </div>
+        </RepoProvider>
+      )}
+    </QueryState>
   )
 }

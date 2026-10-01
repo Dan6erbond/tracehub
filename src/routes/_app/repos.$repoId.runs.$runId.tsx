@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { zid } from 'convex-helpers/server/zod4'
 import { z } from 'zod'
 import { RunPage } from '#/components/run-page'
-import { useRepo } from '#/hooks/use-repos'
+import { useCurrentRepo } from '#/hooks/use-current-repo'
 import { createZodParams } from '#/lib/create-zod-params'
 
 export const Route = createFileRoute('/_app/repos/$repoId/runs/$runId')({
@@ -11,7 +11,6 @@ export const Route = createFileRoute('/_app/repos/$repoId/runs/$runId')({
 })
 
 function Run() {
-  const { repoId, runId } = Route.useParams()
-  const repo = useRepo(repoId)
-  return repo.data ? <RunPage repo={repo.data} runId={runId} /> : null
+  const { runId } = Route.useParams()
+  return <RunPage repo={useCurrentRepo()} runId={runId} />
 }

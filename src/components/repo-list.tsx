@@ -1,5 +1,6 @@
-import { LinkRow, RowLink } from '#/components/row-link'
-import { Badge } from '#/components/ui/badge'
+import { LinkRow } from '#/components/row-link'
+import { StretchedLink } from '#/components/stretched-link'
+import { HostBadge } from '#/components/host-badge'
 import { VisibilityBadge } from '#/components/visibility-badge'
 import {
   Table,
@@ -25,13 +26,13 @@ export function RepoList({ repos }: { repos: Array<Doc<'repos'>> }) {
         {repos.map((repo) => (
           <LinkRow key={repo._id}>
             <TableCell className="whitespace-normal">
-              <RowLink
+              <StretchedLink
                 to="/repos/$repoId"
                 params={{ repoId: repo._id }}
                 className="font-medium"
               >
                 {repo.fullName}
-              </RowLink>
+              </StretchedLink>
               {repo.description && (
                 <div className="text-sm text-muted-foreground">
                   {repo.description}
@@ -39,9 +40,7 @@ export function RepoList({ repos }: { repos: Array<Doc<'repos'>> }) {
               )}
             </TableCell>
             <TableCell>
-              <Badge variant="secondary" className="capitalize">
-                {repo.provider}
-              </Badge>
+              <HostBadge repo={repo} />
             </TableCell>
             <TableCell>
               <VisibilityBadge repo={repo} />

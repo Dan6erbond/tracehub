@@ -42,9 +42,9 @@ function AppLayout() {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
         </header>
-        <main className="flex-1 p-6">
+        <div className="flex flex-1 flex-col p-6">
           <Outlet />
-        </main>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

@@ -13,7 +13,7 @@ function display({
   closedAt,
   mergedAt,
   draft,
-}: Pick<PullRequest, 'closedAt' | 'mergedAt' | 'draft'>) {
+}: Partial<Pick<PullRequest, 'closedAt' | 'mergedAt' | 'draft'>>) {
   if (mergedAt !== undefined)
     return { variant: 'secondary', Icon: GitMerge } as const
   if (closedAt !== undefined)
@@ -22,16 +22,14 @@ function display({
   return { variant: 'outline', Icon: GitPullRequest } as const
 }
 
-/** Links to the PR page in TraceHub when `repoId` is given, to the Git host when `href` is set. */
+/** Links to the PR page in TraceHub when `repoId` is given, to the Git host when `href` is set. Without the PR's state it shows as open. */
 export function PullRequestBadge({
   pullRequest,
   repoId,
   href,
 }: {
-  pullRequest: Pick<
-    PullRequest,
-    'number' | 'title' | 'closedAt' | 'mergedAt' | 'draft'
-  >
+  pullRequest: Pick<PullRequest, 'number'> &
+    Partial<Pick<PullRequest, 'title' | 'closedAt' | 'mergedAt' | 'draft'>>
   repoId?: Id<'repos'>
   href?: string
 }) {
@@ -56,12 +54,7 @@ export function PullRequestBadge({
       </Badge>
     )
   return (
-    <Badge
-      asChild
-      variant={variant}
-      title={pullRequest.title}
-      className="relative z-10"
-    >
+    <Badge asChild variant={variant} title={pullRequest.title}>
       <Link
         to="/repos/$repoId/pulls/$number"
         params={{ repoId, number: pullRequest.number }}

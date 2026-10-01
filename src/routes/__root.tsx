@@ -11,7 +11,11 @@ import type { AuthClient } from '@convex-dev/better-auth/react'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
-import { ThemeProvider, themeInitScript } from '#/components/theme-provider'
+import {
+  ThemeProvider,
+  defaultThemeClassName,
+  themeInitScript,
+} from '#/components/theme-provider'
 import { authClient } from '#/lib/auth-client'
 import { getToken } from '#/lib/auth-server'
 
@@ -80,7 +84,7 @@ function RootComponent() {
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className={defaultThemeClassName} suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

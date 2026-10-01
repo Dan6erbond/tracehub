@@ -4,7 +4,7 @@ import { PullRequestPage } from '#/components/pull-request-page'
 import { RepoBranchesPage } from '#/components/repo-branches-page'
 import { RunPage } from '#/components/run-page'
 import { UploadTracesSheet } from '#/components/upload-traces-sheet'
-import { useRepo } from '#/hooks/use-repos'
+import { useCurrentRepo } from '#/hooks/use-current-repo'
 import { traceTargetSearchSchema } from '#/lib/schemas/trace-target'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import type { TraceTargetSearch } from '#/lib/schemas/trace-target'
@@ -36,8 +36,7 @@ function CreateTraces() {
   const { repoId } = Route.useParams()
   const search = Route.useSearch()
   const navigate = useNavigate()
-  const { data: repo } = useRepo(repoId)
-  if (!repo) return null
+  const repo = useCurrentRepo()
 
   const close = () => {
     const { branch, pull, job } = search

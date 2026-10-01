@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
 import { authClient } from '#/lib/auth-client'
+import { ErrorAlert } from '#/components/error-alert'
+import { PageTitle } from '#/components/page-title'
 import { Badge } from '#/components/ui/badge'
 import {
   Card,
@@ -10,21 +11,12 @@ import {
   CardTitle,
 } from '#/components/ui/card'
 import { Skeleton } from '#/components/ui/skeleton'
+import { useAccounts } from '#/hooks/use-accounts'
+import { formatDate } from '#/lib/format'
 
 export const Route = createFileRoute('/_app/me')({
   component: MePage,
 })
-
-function useAccounts() {
-  return useQuery({
-    queryKey: ['auth', 'accounts'],
-    queryFn: async () => {
-      const { data, error } = await authClient.listAccounts()
-      if (error) throw new Error(error.message)
-      return data
-    },
-  })
-}
 
 function MePage() {
   const { data: session } = authClient.useSession()
@@ -32,10 +24,7 @@ function MePage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{session?.user.name}</h1>
-        <p className="text-muted-foreground">{session?.user.email}</p>
-      </div>
+      <PageTitle title={session?.user.name} description={session?.user.email} />
       <Card>
         <CardHeader>
           <CardTitle>Social connections</CardTitle>
@@ -45,9 +34,7 @@ function MePage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {accounts.isPending && <Skeleton className="h-10 w-full" />}
-          {accounts.isError && (
-            <p className="text-sm text-destructive">{accounts.error.message}</p>
-          )}
+          <ErrorAlert error={accounts.error} />
           {accounts.data?.map((account) => (
             <div
               key={account.id}
@@ -62,7 +49,7 @@ function MePage() {
                 </span>
               </div>
               <span className="text-sm text-muted-foreground">
-                Connected {new Date(account.createdAt).toLocaleDateString()}
+                Connected {formatDate(account.createdAt)}
               </span>
             </div>
           ))}

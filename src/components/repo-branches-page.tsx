@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { RefreshCw } from 'lucide-react'
 import { BranchCard } from '#/components/branch-card'
-import { InfiniteScrollTrigger } from '#/components/infinite-scroll-trigger'
+import { ErrorAlert } from '#/components/error-alert'
+import { PaginatedList } from '#/components/paginated-list'
+import { ReloadButton } from '#/components/reload-button'
 import { RepoTabs } from '#/components/repo-tabs'
-import { Button } from '#/components/ui/button'
 import { Label } from '#/components/ui/label'
-import { Skeleton } from '#/components/ui/skeleton'
 import { Switch } from '#/components/ui/switch'
 import { UploadTracesButton } from '#/components/upload-traces-button'
 import {
@@ -13,16 +12,12 @@ import {
   useBranchesDefaultFirst,
   useInitialRepoSync,
 } from '#/hooks/use-branches'
-import { cn } from '#/lib/utils'
 import type { Doc } from '../../convex/_generated/dataModel'
 
 export function RepoBranchesPage({ repo }: { repo: Doc<'repos'> }) {
   const repoId = repo._id
   const [openPullRequestsOnly, setOpenPullRequestsOnly] = useState(true)
-  const { results, status, loadMore } = useBranchesDefaultFirst(
-    repo,
-    openPullRequestsOnly,
-  )
+  const branches = useBranchesDefaultFirst(repo, openPullRequestsOnly)
   const reload = useInitialRepoSync(repoId)
 
   return (
@@ -40,23 +35,24 @@ export function RepoBranchesPage({ repo }: { repo: Doc<'repos'> }) {
           </Label>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            disabled={reload.isPending}
-            onClick={() => reload.mutate()}
-          >
-            <RefreshCw className={cn(reload.isPending && 'animate-spin')} />
-            Reload
-          </Button>
+          <ReloadButton reload={reload} />
           <UploadTracesButton repoId={repoId} />
         </div>
       </div>
-      {reload.isError && (
-        <p className="text-sm text-destructive">{reload.error.message}</p>
-      )}
-      {status === 'LoadingFirstPage' && <Skeleton className="h-40 w-full" />}
-      {results.length > 0 && (
-        <>
+      <ErrorAlert error={reload.error} />
+      <PaginatedList
+        query={branches}
+        pageSize={BRANCHES_PAGE_SIZE}
+        skeletonClassName="h-40 w-full"
+        empty={
+          <p className="text-muted-foreground">
+            {openPullRequestsOnly
+              ? 'No branches with open pull requests.'
+              : 'No branches found.'}
+          </p>
+        }
+      >
+        {(results) => (
           <div className="grid gap-3 sm:grid-cols-2">
             {results.map((branch) => (
               <BranchCard
@@ -67,20 +63,8 @@ export function RepoBranchesPage({ repo }: { repo: Doc<'repos'> }) {
               />
             ))}
           </div>
-          <InfiniteScrollTrigger
-            canLoadMore={status === 'CanLoadMore'}
-            isLoading={status === 'LoadingMore'}
-            onLoadMore={() => loadMore(BRANCHES_PAGE_SIZE)}
-          />
-        </>
-      )}
-      {status === 'Exhausted' && results.length === 0 && (
-        <p className="text-muted-foreground">
-          {openPullRequestsOnly
-            ? 'No branches with open pull requests.'
-            : 'No branches found.'}
-        </p>
-      )}
+        )}
+      </PaginatedList>
     </div>
   )
 }

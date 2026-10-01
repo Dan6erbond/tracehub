@@ -1,10 +1,5 @@
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from '#/components/ui/field'
 import { Switch } from '#/components/ui/switch'
+import { FieldShell, useFieldInvalid } from './field-shell'
 import { useFieldContext } from './form-context'
 
 export function SwitchField({
@@ -15,17 +10,21 @@ export function SwitchField({
   description?: string
 }) {
   const field = useFieldContext<boolean>()
+  const invalid = useFieldInvalid()
   return (
-    <Field orientation="horizontal">
-      <FieldContent>
-        <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
-        {description && <FieldDescription>{description}</FieldDescription>}
-      </FieldContent>
+    <FieldShell
+      label={label}
+      description={description}
+      orientation="horizontal"
+    >
       <Switch
         id={field.name}
+        name={field.name}
         checked={field.state.value}
+        aria-invalid={invalid}
+        onBlur={field.handleBlur}
         onCheckedChange={field.handleChange}
       />
-    </Field>
+    </FieldShell>
   )
 }

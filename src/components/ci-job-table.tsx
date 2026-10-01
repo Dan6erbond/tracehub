@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import { CiStatusBadge } from '#/components/ci-status-badge'
 import { ExternalTextLink } from '#/components/external-text-link'
-import { LinkRow, RowLink } from '#/components/row-link'
+import { LinkRow } from '#/components/row-link'
+import { StretchedLink } from '#/components/stretched-link'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
 import {
   Table,
@@ -11,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '#/components/ui/table'
-import { formatDuration } from '#/lib/format'
+import { formatElapsed } from '#/lib/format'
 import { jobUrl } from '#/lib/git-host'
 import type { CiJobWithRuns } from '../../convex/ciJobs'
 import type { Doc } from '../../convex/_generated/dataModel'
@@ -39,13 +40,13 @@ export function CiJobTable({
           <LinkRow key={job._id}>
             <TableCell>
               <span className="flex items-center gap-2">
-                <RowLink
+                <StretchedLink
                   to="/repos/$repoId/jobs/$jobId"
                   params={{ repoId: repo._id, jobId: job._id }}
                   className="hover:underline"
                 >
                   {job.name}
-                </RowLink>
+                </StretchedLink>
                 <ExternalTextLink href={jobUrl(repo, job)} />
               </span>
             </TableCell>
@@ -53,9 +54,7 @@ export function CiJobTable({
               <CiStatusBadge status={job.status} />
             </TableCell>
             <TableCell>
-              {job.startedAt !== undefined && job.completedAt !== undefined
-                ? formatDuration(job.completedAt - job.startedAt)
-                : '-'}
+              {formatElapsed(job.startedAt, job.completedAt) ?? '-'}
             </TableCell>
             <TableCell>
               <div className="flex flex-col gap-1">

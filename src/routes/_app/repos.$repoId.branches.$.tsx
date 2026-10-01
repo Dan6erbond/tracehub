@@ -1,13 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { BranchPage } from '#/components/branch-page'
-import { useRepo } from '#/hooks/use-repos'
+import { useCurrentRepo } from '#/hooks/use-current-repo'
 
 export const Route = createFileRoute('/_app/repos/$repoId/branches/$')({
   component: Branch,
 })
 
 function Branch() {
-  const { repoId, _splat: name = '' } = Route.useParams()
-  const repo = useRepo(repoId)
-  return repo.data ? <BranchPage repo={repo.data} name={name} /> : null
+  const { _splat: name = '' } = Route.useParams()
+  return <BranchPage repo={useCurrentRepo()} name={name} />
 }

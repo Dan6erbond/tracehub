@@ -1,5 +1,6 @@
 import { Play } from 'lucide-react'
-import { LinkRow, RowLink } from '#/components/row-link'
+import { LinkRow } from '#/components/row-link'
+import { StretchedLink } from '#/components/stretched-link'
 import { TraceStatusBadge } from '#/components/trace-status-badge'
 import { Button } from '#/components/ui/button'
 import {
@@ -42,13 +43,13 @@ export function TraceTable({ traces }: { traces: Array<Doc<'traces'>> }) {
             <TableCell>{formatBytes(trace.size)}</TableCell>
             <TableCell className="text-right">
               <Button asChild variant="outline" size="sm">
-                <RowLink
+                <StretchedLink
                   to="/repos/$repoId/traces/$traceId"
                   params={{ repoId: trace.repoId, traceId: trace._id }}
                 >
                   <Play />
                   Open
-                </RowLink>
+                </StretchedLink>
               </Button>
             </TableCell>
           </LinkRow>

@@ -1,5 +1,6 @@
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
@@ -12,23 +13,43 @@ export function useFieldInvalid() {
   return isTouched && !isValid
 }
 
+/** Label, description and errors around a control; `horizontal` puts the control beside the text, as for switches. */
 export function FieldShell({
   label,
   description,
+  orientation = 'vertical',
   children,
 }: {
   label: string
   description?: string
+  orientation?: 'vertical' | 'horizontal'
   children: ReactNode
 }) {
   const field = useFieldContext<unknown>()
   const invalid = useFieldInvalid()
-  return (
-    <Field data-invalid={invalid}>
-      <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
-      {children}
+  const labelElement = <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
+  const details = (
+    <>
       {description && <FieldDescription>{description}</FieldDescription>}
       {invalid && <FieldError errors={field.state.meta.errors} />}
+    </>
+  )
+
+  if (orientation === 'horizontal')
+    return (
+      <Field orientation="horizontal" data-invalid={invalid}>
+        <FieldContent>
+          {labelElement}
+          {details}
+        </FieldContent>
+        {children}
+      </Field>
+    )
+  return (
+    <Field data-invalid={invalid}>
+      {labelElement}
+      {children}
+      {details}
     </Field>
   )
 }

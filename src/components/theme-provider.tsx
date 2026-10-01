@@ -6,6 +6,10 @@ export type Theme = 'light' | 'dark' | 'system'
 const STORAGE_KEY = 'theme'
 const DEFAULT_THEME: Theme = 'dark'
 
+/** What the server renders on <html>; the init script corrects it before hydration when a stored preference differs. */
+export const defaultThemeClassName =
+  (DEFAULT_THEME as Theme) === 'dark' ? 'dark' : undefined
+
 // Runs before hydration so a stored light/system preference doesn't flash dark
 export const themeInitScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}')||'${DEFAULT_THEME}';var d=t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})()`
 
