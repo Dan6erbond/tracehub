@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { withSystemFields } from 'convex-helpers/server/zod4'
+import { httpProviderHosts } from './http-provider-hosts'
 import { httpUrlSchema } from './url'
 
 export const gitProviderTypeSchema = z.enum(['github', 'gitea', 'forgejo'])
@@ -36,14 +37,16 @@ const isProviderUrl = (value: string) => {
     !url.password &&
     !url.search &&
     !url.hash &&
-    (url.protocol === 'https:' || LOCAL_HOSTS.has(url.hostname))
+    (url.protocol === 'https:' ||
+      LOCAL_HOSTS.has(url.hostname) ||
+      httpProviderHosts().has(url.hostname))
   )
 }
 
-/** The address of a Git host or its API: https (http only for a local host), without credentials, query or fragment. */
+/** The address of a Git host or its API: https (http only for a local host or one listed in `HTTP_PROVIDER_HOSTS`), without credentials, query or fragment. */
 export const providerUrlSchema = httpUrlSchema.refine(isProviderUrl, {
   error:
-    'Use an https:// address without credentials, query or fragment (http:// only for localhost)',
+    'Use an https:// address without credentials, query or fragment (http:// only for localhost and allowed hosts)',
 })
 
 /** A provider as stored; `clientSecret` is encrypted. */
