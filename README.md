@@ -49,7 +49,7 @@ A single job with the trace runs uploaded for it and links to the pipeline and t
 
 The traces of one run with status, duration and size. Each opens in the trace viewer.
 
-![Traces of a pipeline job run](img/7_screenshot_pipeline_job_with_traces.png)
+![Traces of a pipeline job run](img/7_screenshot_run_with_traces.png)
 
 ### Trace viewer
 
