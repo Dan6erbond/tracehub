@@ -18,6 +18,7 @@ import {
   query,
 } from '../_generated/server'
 import { triggers } from './triggers'
+import { errorCodes } from '../../src/lib/errors'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { ActionCtx, MutationCtx, QueryCtx } from '../_generated/server'
 
@@ -34,7 +35,11 @@ export const zInternalMutation = zCustomMutation(
 
 const requireUserId = async (ctx: QueryCtx | ActionCtx) => {
   const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new ConvexError('Unauthenticated')
+  if (!identity)
+    throw new ConvexError({
+      code: errorCodes.unauthenticated,
+      message: 'Unauthenticated',
+    })
   return { userId: identity.subject }
 }
 
@@ -51,7 +56,11 @@ const requireRepoAccess = async (
     internal.repos.getUserRepo,
     { userId, repoId },
   )
-  if (!repo) throw new ConvexError('Repository not found')
+  if (!repo)
+    throw new ConvexError({
+      code: errorCodes.repoNotFound,
+      message: 'Repository not found',
+    })
   return { userId, repo }
 }
 

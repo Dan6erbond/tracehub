@@ -19,7 +19,15 @@ export const useRepo = (repoId: Id<'repos'>) =>
 
 export function useReloadRepos() {
   const reloadRepos = useConvexAction(api.repos.reloadRepos)
-  return useMutation({ mutationFn: () => reloadRepos({}) })
+  const reload = useMutation({ mutationFn: () => reloadRepos({}) })
+  const { data: reloading } = useQuery(
+    convexQuery(api.reloadLocks.isUserReloading, {}),
+  )
+  return {
+    mutate: reload.mutate,
+    isPending: reload.isPending || reloading === true,
+    error: reload.error,
+  }
 }
 
 /** Scans the Git hosts once when no repos are stored yet. Mount it once, app-wide. */
@@ -28,9 +36,14 @@ export function useInitialRepoScan() {
   const reload = useReloadRepos()
   const scanned = useRef(false)
   useEffect(() => {
-    if (status === 'Exhausted' && results.length === 0 && !scanned.current) {
+    if (
+      status === 'Exhausted' &&
+      results.length === 0 &&
+      !scanned.current &&
+      !reload.isPending
+    ) {
       scanned.current = true
       reload.mutate()
     }
-  }, [status, results.length, reload])
+  }, [status, results.length, reload.isPending, reload.mutate])
 }

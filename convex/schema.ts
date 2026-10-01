@@ -5,11 +5,17 @@ import { branchSchema } from '../src/lib/schemas/branch'
 import { storedCiJobSchema } from '../src/lib/schemas/ci-job'
 import { ciPipelineSchema } from '../src/lib/schemas/ci-pipeline'
 import { pullRequestSchema } from '../src/lib/schemas/pull-request'
+import { reloadLockSchema } from '../src/lib/schemas/reload-lock'
 import { repoSchema } from '../src/lib/schemas/repo'
 import { runSchema } from '../src/lib/schemas/run'
 import { traceSchema } from '../src/lib/schemas/trace'
 
 export default defineSchema({
+  // Separate from repos and userRepos so lock writes never invalidate their queries.
+  reloadLocks: defineTable(zodToConvexFields(reloadLockSchema.shape)).index(
+    'by_key',
+    ['key'],
+  ),
   repos: defineTable(zodToConvexFields(repoSchema.shape)).index(
     'by_provider_externalId',
     ['provider', 'externalId'],

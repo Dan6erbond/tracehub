@@ -17,6 +17,7 @@ import { gitProviders } from './lib/gitProviders'
 import { loadRepositories } from './lib/gitProviders/loadRepositories'
 import { repoActivityAt } from './lib/repoActivity'
 import { replaceOrInsert, uniqueBy } from './lib/upsert'
+import { withReloadLock } from './lib/withReloadLock'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { gitProviderSchema, repoSchema } from '../src/lib/schemas/repo'
 import type { PullRequest } from '../src/lib/schemas/pull-request'
@@ -149,88 +150,93 @@ export const pruneUserRepos = zInternalMutation({
 
 export const reloadRepos = authedAction({
   args: {},
-  handler: async (ctx) => {
-    const { providers, repos } = await loadRepositories(ctx)
-    const startedAt = Date.now()
-    for (const batch of chunk(repos, SYNC_REPOS_BATCH_SIZE))
-      await ctx.runMutation(internal.repos.syncUserRepos, {
-        userId: ctx.userId,
-        repos: batch,
-        syncedAt: startedAt,
-      })
-    let cursor: string | null = null
-    do
-      cursor = await ctx.runMutation(internal.repos.pruneUserRepos, {
-        userId: ctx.userId,
-        providers,
-        before: startedAt,
-        cursor,
-      })
-    while (cursor !== null)
-  },
+  handler: (ctx) =>
+    withReloadLock(ctx, { kind: 'user', userId: ctx.userId }, async () => {
+      const { providers, repos } = await loadRepositories(ctx)
+      const startedAt = Date.now()
+      for (const batch of chunk(repos, SYNC_REPOS_BATCH_SIZE))
+        await ctx.runMutation(internal.repos.syncUserRepos, {
+          userId: ctx.userId,
+          repos: batch,
+          syncedAt: startedAt,
+        })
+      let cursor: string | null = null
+      do
+        cursor = await ctx.runMutation(internal.repos.pruneUserRepos, {
+          userId: ctx.userId,
+          providers,
+          before: startedAt,
+          cursor,
+        })
+      while (cursor !== null)
+    }),
 })
 
 export const reloadRepo = repoAction({
   args: {},
-  handler: async (ctx, { repoId }) => {
-    const adapter = gitProviders[ctx.repo.provider]
-    const accessToken = await getProviderAccessToken(ctx, ctx.repo.provider)
-    const startedAt = Date.now()
+  handler: (ctx, { repoId }) =>
+    withReloadLock(ctx, { kind: 'repo', repoId }, async () => {
+      const adapter = gitProviders[ctx.repo.provider]
+      const accessToken = await getProviderAccessToken(ctx, ctx.repo.provider)
+      const startedAt = Date.now()
 
-    for await (const branches of adapter.listBranches(accessToken, ctx.repo))
-      await ctx.runMutation(internal.branches.upsertBranches, {
-        repoId,
-        branches,
-        syncedAt: startedAt,
-      })
-    // Only reached when every page loaded, so a failed sync never prunes live branches.
-    let hasMore = true
-    while (hasMore)
-      hasMore = await ctx.runMutation(internal.branches.pruneBranches, {
-        repoId,
-        before: startedAt,
-      })
+      for await (const branches of adapter.listBranches(accessToken, ctx.repo))
+        await ctx.runMutation(internal.branches.upsertBranches, {
+          repoId,
+          branches,
+          syncedAt: startedAt,
+        })
+      // Only reached when every page loaded, so a failed sync never prunes live branches.
+      let hasMore = true
+      while (hasMore)
+        hasMore = await ctx.runMutation(internal.branches.pruneBranches, {
+          repoId,
+          before: startedAt,
+        })
 
-    // Fetched completely before anything is stored, then stored oldest first: the next reload resumes
-    // after the newest stored pull request, so an interrupted run must never leave newer ones behind older gaps.
-    const since = await ctx.runQuery(internal.pullRequests.latestUpdatedAt, {
-      repoId,
-    })
-    const pullRequestPages: Array<Array<PullRequest>> = []
-    for await (const pullRequests of adapter.listPullRequests(
-      accessToken,
-      ctx.repo,
-      since ?? undefined,
-    ))
-      pullRequestPages.push(pullRequests)
-    for (const pullRequests of pullRequestPages.reverse())
-      await ctx.runMutation(internal.pullRequests.upsertPullRequests, {
+      // Fetched completely before anything is stored, then stored oldest first: the next reload resumes
+      // after the newest stored pull request, so an interrupted run must never leave newer ones behind older gaps.
+      const since = await ctx.runQuery(internal.pullRequests.latestUpdatedAt, {
         repoId,
-        pullRequests,
       })
+      const pullRequestPages: Array<Array<PullRequest>> = []
+      for await (const pullRequests of adapter.listPullRequests(
+        accessToken,
+        ctx.repo,
+        since ?? undefined,
+      ))
+        pullRequestPages.push(pullRequests)
+      for (const pullRequests of pullRequestPages.reverse())
+        await ctx.runMutation(internal.pullRequests.upsertPullRequests, {
+          repoId,
+          pullRequests,
+        })
 
-    for await (const pipelines of adapter.listPipelines(accessToken, ctx.repo))
-      await ctx.runMutation(internal.ciPipelines.upsertPipelines, {
-        repoId,
-        pipelines,
-      })
+      for await (const pipelines of adapter.listPipelines(
+        accessToken,
+        ctx.repo,
+      ))
+        await ctx.runMutation(internal.ciPipelines.upsertPipelines, {
+          repoId,
+          pipelines,
+        })
 
-    const shas: Array<string> = await ctx.runQuery(internal.ciJobs.headShas, {
-      repoId,
-    })
-    for await (const jobs of adapter.listJobs(accessToken, ctx.repo, shas))
-      await ctx.runMutation(internal.ciJobs.upsertJobs, {
+      const shas: Array<string> = await ctx.runQuery(internal.ciJobs.headShas, {
         repoId,
-        jobs,
-        syncedAt: startedAt,
       })
-    for (const batch of chunk(shas, PRUNE_JOBS_SHA_BATCH_SIZE))
-      await ctx.runMutation(internal.ciJobs.pruneJobs, {
-        repoId,
-        shas: batch,
-        before: startedAt,
-      })
-  },
+      for await (const jobs of adapter.listJobs(accessToken, ctx.repo, shas))
+        await ctx.runMutation(internal.ciJobs.upsertJobs, {
+          repoId,
+          jobs,
+          syncedAt: startedAt,
+        })
+      for (const batch of chunk(shas, PRUNE_JOBS_SHA_BATCH_SIZE))
+        await ctx.runMutation(internal.ciJobs.pruneJobs, {
+          repoId,
+          shas: batch,
+          before: startedAt,
+        })
+    }),
 })
 
 export const getUserRepo = zInternalQuery({
