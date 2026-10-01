@@ -1,8 +1,10 @@
 import { z } from 'zod'
 import { ConvexError } from 'convex/values'
 import { asyncMap, pruneNull } from 'convex-helpers'
+import { stream } from 'convex-helpers/server/stream'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
+import schema from './schema'
 import { findInRepoQuery } from './lib/findInRepo'
 import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
 import { insertAndGet, replaceOrInsert, uniqueBy } from './lib/upsert'
@@ -10,11 +12,14 @@ import { withRunDetails } from './runs'
 import { ciJobSchema } from '../src/lib/schemas/ci-job'
 import { httpUrlSchema } from '../src/lib/schemas/url'
 import type { Doc, Id } from './_generated/dataModel'
-import type { QueryCtx } from './_generated/server'
+import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { RunDetail } from './runs'
 
 // Jobs are synced for the most recently active heads only, so a repo with thousands of branches keeps a bounded reload.
 const MAX_HEADS_PER_SOURCE = 100
+
+// Branches without CI are skipped while looking for heads; the cap keeps a repo with few CI branches from scanning all of them.
+const MAX_BRANCHES_SCANNED_FOR_HEADS = 1000
 
 export type CiJobWithRuns = Doc<'ciJobs'> & { runs: Array<RunDetail> }
 
@@ -50,7 +55,35 @@ export const findByExternalId = zInternalQuery({
       .withIndex('by_repo_sha_externalId', (q) =>
         q.eq('repoId', repoId).eq('sha', sha).eq('externalId', externalId),
       )
-      .unique(),
+      .first(),
+})
+
+/** Jobs of a commit outside any pipeline (commit statuses, and uploads that name a job only). With `stubsOnly`, only those an upload named by name that no sync has replaced yet. */
+export const findAtShaByName = zInternalQuery({
+  args: {
+    repoId: zid('repos'),
+    sha: z.string(),
+    name: z.string(),
+    stubsOnly: z.boolean().optional(),
+  },
+  handler: (ctx, { repoId, sha, name, stubsOnly }) =>
+    ctx.db
+      .query('ciJobs')
+      .withIndex('by_repo_sha_name', (q) =>
+        q.eq('repoId', repoId).eq('sha', sha).eq('name', name),
+      )
+      .filter((q) =>
+        q.and(
+          q.eq(q.field('pipelineId'), undefined),
+          ...(stubsOnly
+            ? [
+                q.eq(q.field('syncedAt'), undefined),
+                q.eq(q.field('externalId'), undefined),
+              ]
+            : []),
+        ),
+      )
+      .first(),
 })
 
 export const findInPipelineByExternalId = zInternalQuery({
@@ -64,22 +97,27 @@ export const findInPipelineByExternalId = zInternalQuery({
       .first(),
 })
 
-/** With `unsyncedOnly`, only jobs an upload created that no sync has replaced yet. */
+/** With `stubsOnly`, only jobs an upload named by name that no sync has replaced yet. */
 export const findInPipelineByName = zInternalQuery({
   args: {
     pipelineId: zid('ciPipelines'),
     name: z.string(),
-    unsyncedOnly: z.boolean().optional(),
+    stubsOnly: z.boolean().optional(),
   },
-  handler: (ctx, { pipelineId, name, unsyncedOnly }) => {
+  handler: (ctx, { pipelineId, name, stubsOnly }) => {
     const ofName = ctx.db
       .query('ciJobs')
       .withIndex('by_pipeline', (q) =>
         q.eq('pipelineId', pipelineId).eq('name', name),
       )
     return (
-      unsyncedOnly
-        ? ofName.filter((q) => q.eq(q.field('syncedAt'), undefined))
+      stubsOnly
+        ? ofName.filter((q) =>
+            q.and(
+              q.eq(q.field('syncedAt'), undefined),
+              q.eq(q.field('externalId'), undefined),
+            ),
+          )
         : ofName
     ).first()
   },
@@ -89,13 +127,18 @@ export const findInPipelineByName = zInternalQuery({
 export const headShas = zInternalQuery({
   args: { repoId: zid('repos') },
   handler: async (ctx, { repoId }) => {
-    const branches = await ctx.db
+    const { page: branches } = await stream(ctx.db, schema)
       .query('branches')
       .withIndex('by_repo_remoteDeletedAt_committedAt', (q) =>
         q.eq('repoId', repoId).eq('remoteDeletedAt', undefined),
       )
       .order('desc')
-      .take(MAX_HEADS_PER_SOURCE)
+      .filterWith(({ ciStatus }) => Promise.resolve(ciStatus !== undefined))
+      .paginate({
+        numItems: MAX_HEADS_PER_SOURCE,
+        cursor: null,
+        maximumRowsRead: MAX_BRANCHES_SCANNED_FOR_HEADS,
+      })
     const pullRequests = await ctx.db
       .query('pullRequests')
       .withIndex('by_repo_closedAt_updatedAt', (q) =>
@@ -105,16 +148,14 @@ export const headShas = zInternalQuery({
       .take(MAX_HEADS_PER_SOURCE)
     return [
       ...new Set([
-        ...branches
-          .filter(({ ciStatus }) => ciStatus !== undefined)
-          .map(({ headSha }) => headSha),
+        ...branches.map(({ headSha }) => headSha),
         ...pullRequests.map(({ headSha }) => headSha),
       ]),
     ]
   },
 })
 
-/** The stored job a host-reported job is: the one with its id, else the job an upload created for it in the same pipeline by name. Says which of the two matched. */
+/** The stored job a host-reported job is: the one with its id, else the job an upload named by name only for it, in the same pipeline or, outside pipelines, at the same commit. Says which of the two matched. */
 export const findForSync = zInternalQuery({
   args: {
     repoId: zid('repos'),
@@ -135,11 +176,19 @@ export const findForSync = zInternalQuery({
       { repoId, sha, externalId },
     )
     if (byExternalId) return { job: byExternalId, matchedBy: 'externalId' }
-    if (pipelineId === undefined) return null
-    const byName: Doc<'ciJobs'> | null = await ctx.runQuery(
-      internal.ciJobs.findInPipelineByName,
-      { pipelineId, name, unsyncedOnly: true },
-    )
+    const byName: Doc<'ciJobs'> | null =
+      pipelineId === undefined
+        ? await ctx.runQuery(internal.ciJobs.findAtShaByName, {
+            repoId,
+            sha,
+            name,
+            stubsOnly: true,
+          })
+        : await ctx.runQuery(internal.ciJobs.findInPipelineByName, {
+            pipelineId,
+            name,
+            stubsOnly: true,
+          })
     return byName && { job: byName, matchedBy: 'name' }
   },
 })
@@ -196,12 +245,76 @@ export const upsertJobs = zInternalMutation({
       return replaceOrInsert(ctx, 'ciJobs', existing, {
         repoId,
         ...job,
-        pipelineId,
+        // A pipeline an upload attached stays when the host reports the job without one.
+        pipelineId: pipelineId ?? existing?.pipelineId,
         syncedAt,
       })
     })
   },
 })
+
+/** The job an upload names by id: one of its pipeline, else a job of the commit outside any pipeline (synced before its pipeline was), which the upload then attaches to the pipeline. */
+const findJobById = async (
+  ctx: MutationCtx,
+  {
+    repoId,
+    sha,
+    pipelineId,
+    externalId,
+  }: {
+    repoId: Id<'repos'>
+    sha: string
+    pipelineId: Id<'ciPipelines'> | undefined
+    externalId: string
+  },
+): Promise<Doc<'ciJobs'> | null> => {
+  const inPipeline: Doc<'ciJobs'> | null =
+    pipelineId === undefined
+      ? null
+      : await ctx.runQuery(internal.ciJobs.findInPipelineByExternalId, {
+          pipelineId,
+          externalId,
+        })
+  if (inPipeline) return inPipeline
+  const atSha: Doc<'ciJobs'> | null = await ctx.runQuery(
+    internal.ciJobs.findByExternalId,
+    { repoId, sha, externalId },
+  )
+  return atSha &&
+    (pipelineId === undefined ||
+      atSha.pipelineId === undefined ||
+      atSha.pipelineId === pipelineId)
+    ? atSha
+    : null
+}
+
+/** The job an upload names by name only: one of its pipeline, else a job of the commit outside any pipeline, which the upload then attaches to the pipeline. */
+const findJobByName = async (
+  ctx: MutationCtx,
+  {
+    repoId,
+    sha,
+    pipelineId,
+    name,
+  }: {
+    repoId: Id<'repos'>
+    sha: string
+    pipelineId: Id<'ciPipelines'> | undefined
+    name: string
+  },
+): Promise<Doc<'ciJobs'> | null> => {
+  const inPipeline: Doc<'ciJobs'> | null =
+    pipelineId === undefined
+      ? null
+      : await ctx.runQuery(internal.ciJobs.findInPipelineByName, {
+          pipelineId,
+          name,
+        })
+  return (
+    inPipeline ??
+    ctx.runQuery(internal.ciJobs.findAtShaByName, { repoId, sha, name })
+  )
+}
 
 /** The job an upload runs in, created when the host has not reported it yet; the next sync replaces it, keeping the id. `sha` is the commit of its pipeline, if it has one. */
 export const ensureJob = zInternalMutation({
@@ -217,35 +330,26 @@ export const ensureJob = zInternalMutation({
     ctx,
     { repoId, sha, pipelineId, externalId, name, url },
   ): Promise<Doc<'ciJobs'>> => {
-    const key = externalId ?? name
-    if (key === undefined) throw new ConvexError('A job needs an id or a name')
+    const jobName = name ?? externalId
+    if (jobName === undefined)
+      throw new ConvexError('A job needs an id or a name')
     const existing: Doc<'ciJobs'> | null =
-      pipelineId === undefined
-        ? await ctx.runQuery(internal.ciJobs.findByExternalId, {
-            repoId,
-            sha,
-            externalId: key,
-          })
-        : externalId === undefined
-          ? await ctx.runQuery(internal.ciJobs.findInPipelineByName, {
-              pipelineId,
-              name: key,
-            })
-          : await ctx.runQuery(internal.ciJobs.findInPipelineByExternalId, {
-              pipelineId,
-              externalId,
-            })
-    return (
-      existing ??
-      insertAndGet(ctx, 'ciJobs', {
+      externalId === undefined
+        ? await findJobByName(ctx, { repoId, sha, pipelineId, name: jobName })
+        : await findJobById(ctx, { repoId, sha, pipelineId, externalId })
+    if (!existing)
+      return insertAndGet(ctx, 'ciJobs', {
         repoId,
         sha,
-        externalId: key,
-        name: name ?? key,
+        externalId,
+        name: jobName,
         pipelineId,
         url,
       })
-    )
+    if (pipelineId === undefined || existing.pipelineId !== undefined)
+      return existing
+    await ctx.db.patch('ciJobs', existing._id, { pipelineId })
+    return { ...existing, pipelineId }
   },
 })
 

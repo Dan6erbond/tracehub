@@ -30,9 +30,11 @@ export const scopedStream = async <T extends { branch?: string }>(
     [
       ...(branch === undefined ? [] : [onBranch(branch)]),
       ...prNumbers.map((prNumber) =>
-        onPull(prNumber).filterWith((row) =>
-          Promise.resolve(row.branch !== branch),
-        ),
+        branch === undefined
+          ? onPull(prNumber)
+          : onPull(prNumber).filterWith((row) =>
+              Promise.resolve(row.branch !== branch),
+            ),
       ),
     ],
     orderBy,

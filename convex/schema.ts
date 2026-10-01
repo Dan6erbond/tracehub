@@ -2,7 +2,7 @@ import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 import { zodToConvexFields } from 'convex-helpers/server/zod4'
 import { branchSchema } from '../src/lib/schemas/branch'
-import { ciJobSchema } from '../src/lib/schemas/ci-job'
+import { storedCiJobSchema } from '../src/lib/schemas/ci-job'
 import { ciPipelineSchema } from '../src/lib/schemas/ci-pipeline'
 import { pullRequestSchema } from '../src/lib/schemas/pull-request'
 import { repoSchema } from '../src/lib/schemas/repo'
@@ -62,7 +62,7 @@ export default defineSchema({
     .index('by_repo_head', ['repoId', 'fromFork', 'headBranch', 'closedAt']),
   ciJobs: defineTable({
     repoId: v.id('repos'),
-    ...zodToConvexFields(ciJobSchema.omit({ pipeline: true }).shape),
+    ...zodToConvexFields(storedCiJobSchema.shape),
     pipelineId: v.optional(v.id('ciPipelines')),
     // Absent on jobs created from an upload until the host reports them.
     syncedAt: v.optional(v.number()),

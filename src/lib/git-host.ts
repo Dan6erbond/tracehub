@@ -1,10 +1,10 @@
 import type { GitProvider, Repo } from '#/lib/schemas/repo'
-import type { CiJob } from '#/lib/schemas/ci-job'
+import type { StoredCiJob } from '#/lib/schemas/ci-job'
 import type { CiPipeline } from '#/lib/schemas/ci-pipeline'
 
 type HostRepo = Pick<Repo, 'provider' | 'htmlUrl'>
 type PipelineRef = Pick<CiPipeline, 'externalId' | 'url'>
-type JobRef = Pick<CiJob, 'externalId' | 'url'>
+type JobRef = Pick<StoredCiJob, 'externalId' | 'url'>
 
 const encodePath = (path: string) =>
   path.split('/').map(encodeURIComponent).join('/')
@@ -55,7 +55,10 @@ export const pipelineUrl = (repo: HostRepo, pipeline: PipelineRef) =>
 
 /** A job's page: the commit status's own target, else derived from its id. */
 export const jobUrl = (repo: HostRepo, job: JobRef) =>
-  job.url ?? hostUrl(repo, hosts[repo.provider].jobPath(job.externalId))
+  job.url ??
+  (job.externalId === undefined
+    ? undefined
+    : hostUrl(repo, hosts[repo.provider].jobPath(job.externalId)))
 
 /** The CI page of a run: its job's, else its pipeline's. */
 export const runCiUrl = (

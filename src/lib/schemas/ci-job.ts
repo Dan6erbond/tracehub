@@ -18,3 +18,9 @@ export const ciJobSchema = z.object({
   completedAt: z.number().optional(),
 })
 export type CiJob = z.infer<typeof ciJobSchema>
+
+export const storedCiJobSchema = ciJobSchema.omit({ pipeline: true }).extend({
+  // Absent on jobs an upload named only by name, so they never occupy the id of a host job of the same name.
+  externalId: z.string().optional(),
+})
+export type StoredCiJob = z.infer<typeof storedCiJobSchema>
