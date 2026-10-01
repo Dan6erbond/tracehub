@@ -22,7 +22,16 @@ type HostUrlScheme = {
 const encodePath = (path: string) =>
   path.split('/').map(encodeURIComponent).join('/')
 
-const isNumericId = (id: string) => /^\d+$/.test(id)
+export const isNumericId = (id: string) => /^\d+$/.test(id)
+
+/** Run and job pages of Gitea and Forgejo are numbered differently per version, so they are only known from what the host reported. */
+const giteaUrlScheme: HostUrlScheme = {
+  branchPath: (name) => `src/branch/${encodePath(name)}`,
+  commitPath: (sha) => `commit/${sha}`,
+  pullPath: (number) => `pulls/${number}`,
+  pipelinePath: () => undefined,
+  jobPath: () => undefined,
+}
 
 const hostUrlSchemes: Record<GitProviderType, HostUrlScheme> = {
   github: {
@@ -39,6 +48,8 @@ const hostUrlSchemes: Record<GitProviderType, HostUrlScheme> = {
         : `runs/${id}`
     },
   },
+  gitea: giteaUrlScheme,
+  forgejo: giteaUrlScheme,
 }
 
 /** The only place that decides where a repo's pages start. */

@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '#/components/ui/table'
+import { gitProviderTypeLabels } from '#/lib/schemas/git-provider'
 import type { GitProviderAdmin } from '#/lib/schemas/git-provider'
 
 function YesNo({ value }: { value: boolean }) {
@@ -47,7 +48,7 @@ export function ProvidersTable({
                 {provider.name}
               </StretchedLink>
             </TableCell>
-            <TableCell className="capitalize">{provider.type}</TableCell>
+            <TableCell>{gitProviderTypeLabels[provider.type]}</TableCell>
             <TableCell>{new URL(provider.baseUrl).host}</TableCell>
             <TableCell>
               <YesNo value={provider.enabled} />

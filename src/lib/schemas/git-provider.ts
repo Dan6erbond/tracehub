@@ -2,8 +2,14 @@ import { z } from 'zod'
 import { withSystemFields } from 'convex-helpers/server/zod4'
 import { httpUrlSchema } from './url'
 
-export const gitProviderTypeSchema = z.enum(['github'])
+export const gitProviderTypeSchema = z.enum(['github', 'gitea', 'forgejo'])
 export type GitProviderType = z.infer<typeof gitProviderTypeSchema>
+
+export const gitProviderTypeLabels: Record<GitProviderType, string> = {
+  github: 'GitHub',
+  gitea: 'Gitea',
+  forgejo: 'Forgejo',
+}
 
 // Better Auth stores email-and-password logins as accounts with this provider id.
 const RESERVED_SLUGS = new Set(['credential'])
@@ -124,6 +130,32 @@ export const providerTemplates: ReadonlyArray<ProviderTemplate> = [
     defaults: {
       slug: 'github-enterprise',
       name: 'GitHub Enterprise',
+      baseUrl: '',
+      apiUrl: '',
+    },
+    editable: ['slug', 'name', 'baseUrl', 'apiUrl'],
+  },
+  {
+    key: 'gitea',
+    type: 'gitea',
+    label: 'Gitea',
+    description: 'A self-hosted Gitea',
+    defaults: {
+      slug: 'gitea',
+      name: 'Gitea',
+      baseUrl: '',
+      apiUrl: '',
+    },
+    editable: ['slug', 'name', 'baseUrl', 'apiUrl'],
+  },
+  {
+    key: 'forgejo',
+    type: 'forgejo',
+    label: 'Forgejo',
+    description: 'A self-hosted Forgejo, or Codeberg',
+    defaults: {
+      slug: 'forgejo',
+      name: 'Forgejo',
       baseUrl: '',
       apiUrl: '',
     },

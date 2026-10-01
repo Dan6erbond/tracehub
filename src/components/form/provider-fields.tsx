@@ -42,7 +42,7 @@ export const ProviderFields = withFieldGroup({
           {(field) => (
             <field.TextField
               label="Base URL"
-              placeholder="https://github.example.com"
+              placeholder="https://git.example.com"
               description="The web address of the host"
             />
           )}

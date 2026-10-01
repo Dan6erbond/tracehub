@@ -18,6 +18,7 @@ import {
   callbackBaseQueryOptions,
   providerQueryOptions,
 } from '#/lib/provider-queries'
+import { gitProviderTypeLabels } from '#/lib/schemas/git-provider'
 
 export const Route = createFileRoute('/admin/providers/$providerId')({
   params: createZodParams(z.object({ providerId: zid('gitProviders') })),
@@ -48,8 +49,8 @@ function ProviderPage() {
           </>
         }
       >
-        <Badge variant="secondary" className="capitalize">
-          {provider.type}
+        <Badge variant="secondary">
+          {gitProviderTypeLabels[provider.type]}
         </Badge>
       </PageTitle>
       <Card>

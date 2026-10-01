@@ -7,6 +7,9 @@ const GITHUB_COM = 'https://github.com'
 export const isGithubDotCom = ({ baseUrl }: Pick<ProviderConfig, 'baseUrl'>) =>
   baseUrl === GITHUB_COM
 
+const giteaApiUrl = ({ baseUrl }: Pick<ProviderConfig, 'baseUrl'>) =>
+  `${baseUrl}/api/v1`
+
 const defaultApiUrls: Record<
   GitProviderType,
   (provider: Pick<ProviderConfig, 'baseUrl'>) => string
@@ -15,6 +18,8 @@ const defaultApiUrls: Record<
     isGithubDotCom(provider)
       ? 'https://api.github.com'
       : `${provider.baseUrl}/api/v3`,
+  gitea: giteaApiUrl,
+  forgejo: giteaApiUrl,
 }
 
 /** The one place that decides where a provider's REST API lives: its override, else the default of its type. */

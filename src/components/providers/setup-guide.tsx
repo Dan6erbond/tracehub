@@ -43,10 +43,12 @@ function VariantSteps({
           </li>
         ))}
       </ol>
-      {variant.note && (
+      {variant.notes && (
         <Alert>
           <Info />
-          <AlertDescription>{variant.note}</AlertDescription>
+          {variant.notes.map((note) => (
+            <AlertDescription key={note}>{note}</AlertDescription>
+          ))}
         </Alert>
       )}
     </div>

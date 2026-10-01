@@ -1,3 +1,4 @@
+import { formatScopes } from './provider-scopes'
 import type { GitProviderType } from './schemas/git-provider'
 
 export interface GuideStep {
@@ -10,13 +11,19 @@ export interface GuideVariant {
   key: string
   title: string
   steps: ReadonlyArray<GuideStep>
-  note?: string
+  notes?: ReadonlyArray<string>
 }
 
 export interface SetupGuide {
   /** The first variant is the recommended one. */
   variants: ReadonlyArray<GuideVariant>
 }
+
+const REGRANT_NOTE =
+  'A grant keeps the scopes it was made with. When TraceHub requests different ones, users must revoke the application in their host settings and sign in again.'
+
+const TRUST_NOTE =
+  'Only trust this host for linking when it confirms email addresses: set [service] REGISTER_EMAIL_CONFIRM = true in its app.ini.'
 
 /** How to register the OAuth application on the host, per provider type; the callback URL is shown next to it. */
 export const setupGuides: Record<GitProviderType, SetupGuide> = {
@@ -41,7 +48,7 @@ export const setupGuides: Record<GitProviderType, SetupGuide> = {
           },
           { text: 'Register the application and generate a client secret.' },
           {
-            text: 'Enter the client ID and the client secret below. TraceHub requests the scopes read:user, user:email and repo itself.',
+            text: `Enter the client ID and the client secret below. TraceHub requests the scopes ${formatScopes('github')} itself.`,
           },
         ],
       },
@@ -71,7 +78,73 @@ export const setupGuides: Record<GitProviderType, SetupGuide> = {
             text: 'Enter the client ID (it starts with Iv) and the client secret below.',
           },
         ],
-        note: 'A GitHub App only sees the repositories of accounts and organizations where it is installed, so install it wherever TraceHub should list repositories.',
+        notes: [
+          'A GitHub App only sees the repositories of accounts and organizations where it is installed, so install it wherever TraceHub should list repositories.',
+        ],
+      },
+    ],
+  },
+  gitea: {
+    variants: [
+      {
+        key: 'oauth2-application',
+        title: 'OAuth2 application',
+        steps: [
+          {
+            text: 'Open User settings → Applications → Manage OAuth2 Applications. To register it instance-wide, use Site administration → Integrations → Applications instead.',
+            link: {
+              label: 'Your applications',
+              path: '/user/settings/applications',
+            },
+          },
+          { text: 'Enter an application name.' },
+          {
+            text: 'Set the redirect URI to the callback URL above and keep "Confidential Client" checked.',
+          },
+          {
+            text: 'Create the application and copy the client secret, which is only shown once.',
+          },
+          {
+            text: `Enter the client ID and the client secret below. TraceHub requests the scopes ${formatScopes('gitea')} itself.`,
+          },
+        ],
+        notes: [
+          'Gitea before version 1.23 ignores scopes, so the access token then has the full rights of the user.',
+          REGRANT_NOTE,
+          TRUST_NOTE,
+        ],
+      },
+    ],
+  },
+  forgejo: {
+    variants: [
+      {
+        key: 'oauth2-application',
+        title: 'OAuth2 application',
+        steps: [
+          {
+            text: 'Open User settings → Applications → Manage OAuth2 applications. To register it instance-wide, use Site administration → Integrations → Applications instead.',
+            link: {
+              label: 'Your applications',
+              path: '/user/settings/applications',
+            },
+          },
+          { text: 'Enter an application name.' },
+          {
+            text: 'Set the redirect URI to the callback URL above and keep "Confidential client" checked.',
+          },
+          {
+            text: 'Create the application and copy the client secret, which is only shown once.',
+          },
+          {
+            text: `Enter the client ID and the client secret below. TraceHub requests the scopes ${formatScopes('forgejo')} itself.`,
+          },
+        ],
+        notes: [
+          'Forgejo before version 9 ignores scopes, so the access token then has the full rights of the user.',
+          REGRANT_NOTE,
+          TRUST_NOTE,
+        ],
       },
     ],
   },

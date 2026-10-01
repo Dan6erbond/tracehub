@@ -2,6 +2,9 @@ import { Octokit } from '@octokit/rest'
 import { toHttpUrl } from '../../../src/lib/schemas/url'
 import { chunk } from '../chunk'
 import { resolveApiUrl } from './apiUrl'
+import { toCiStatus } from './ciStatus'
+import { sinceUpdated } from './sinceUpdated'
+import { toTime } from './time'
 import type { Branch } from '../../../src/lib/schemas/branch'
 import type { CiJob } from '../../../src/lib/schemas/ci-job'
 import type { CiPipeline } from '../../../src/lib/schemas/ci-pipeline'
@@ -156,18 +159,6 @@ const NO_CONTEXTS: Connection<JobContextNode> = {
   pageInfo: { hasNextPage: false, endCursor: null },
 }
 
-const PASSING_CONCLUSIONS = new Set(['SUCCESS', 'NEUTRAL', 'SKIPPED'])
-
-// Check run and workflow run states arrive upper-case from GraphQL and lower-case from REST.
-const toCiStatus = (status: string | null, conclusion: string | null) => {
-  if (status?.toUpperCase() !== 'COMPLETED') return 'pending'
-  return PASSING_CONCLUSIONS.has((conclusion ?? '').toUpperCase())
-    ? 'success'
-    : 'failure'
-}
-
-const toTime = (value: string | null) => (value ? Date.parse(value) : undefined)
-
 const toJob = (sha: string, node: JobContextNode): CiJob => {
   if (node.__typename === 'StatusContext')
     return {
@@ -202,6 +193,20 @@ interface PullRequestNode {
   mergedAt: string | null
   author: { login: string } | null
 }
+
+const toPullRequest = (node: PullRequestNode): PullRequest => ({
+  number: node.number,
+  title: node.title,
+  draft: node.isDraft,
+  headBranch: node.headRefName,
+  headSha: node.headRefOid,
+  baseBranch: node.baseRefName,
+  fromFork: node.isCrossRepository,
+  author: node.author?.login,
+  updatedAt: Date.parse(node.updatedAt),
+  closedAt: toTime(node.closedAt),
+  mergedAt: toTime(node.mergedAt),
+})
 
 export const createGithubAdapter = (
   provider: ProviderConfig,
@@ -254,7 +259,7 @@ export const createGithubAdapter = (
         yield branches
       }
     },
-    listPullRequests: async function* (accessToken, { owner, name }, since) {
+    listPullRequests: (accessToken, { owner, name }, since) => {
       const octokit = createOctokit(accessToken)
       const pages = paginate<PullRequestNode>(async (after) => {
         const { repository } = await octokit.graphql<{
@@ -262,27 +267,10 @@ export const createGithubAdapter = (
         }>(PULL_REQUESTS_QUERY, { owner, name, after })
         return repository.pullRequests
       })
-      for await (const nodes of pages) {
-        const pullRequests: Array<PullRequest> = nodes.map((node) => ({
-          number: node.number,
-          title: node.title,
-          draft: node.isDraft,
-          headBranch: node.headRefName,
-          headSha: node.headRefOid,
-          baseBranch: node.baseRefName,
-          fromFork: node.isCrossRepository,
-          author: node.author?.login,
-          updatedAt: Date.parse(node.updatedAt),
-          closedAt: node.closedAt ? Date.parse(node.closedAt) : undefined,
-          mergedAt: node.mergedAt ? Date.parse(node.mergedAt) : undefined,
-        }))
-        const fresh =
-          since === undefined
-            ? pullRequests
-            : pullRequests.filter((pr) => pr.updatedAt >= since)
-        if (fresh.length > 0) yield fresh
-        if (fresh.length < pullRequests.length) return
+      async function* pullRequestPages() {
+        for await (const nodes of pages) yield nodes.map(toPullRequest)
       }
+      return sinceUpdated(pullRequestPages(), since)
     },
     listJobs: async function* (accessToken, { owner, name }, shas) {
       const octokit = createOctokit(accessToken)

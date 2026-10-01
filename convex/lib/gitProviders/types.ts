@@ -64,7 +64,7 @@ export interface GitProviderAdapter {
   listPipelineJobs: (
     accessToken: string,
     repo: RepoRef,
-    pipeline: Pick<CiPipeline, 'sha' | 'externalId'>,
+    pipeline: Pick<CiPipeline, 'sha' | 'externalId' | 'webPath'>,
   ) => Promise<Array<CiJob>>
 }
 

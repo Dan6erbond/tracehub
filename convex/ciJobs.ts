@@ -8,6 +8,7 @@ import schema from './schema'
 import { findInRepoQuery } from './lib/findInRepo'
 import { withJobLinks, withPipelineLinks } from './lib/hostLinks'
 import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
+import { MAX_HEADS_PER_SOURCE } from './lib/syncLimits'
 import { insertAndGet, replaceOrInsert, uniqueBy } from './lib/upsert'
 import { ciJobSchema } from '../src/lib/schemas/ci-job'
 import { httpUrlSchema } from '../src/lib/schemas/url'
@@ -15,9 +16,6 @@ import type { RepoHost } from './lib/gitProviders/types'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { CiPage, CommitLink } from '../src/lib/schemas/host-links'
-
-// Jobs are synced for the most recently active heads only, so a repo with thousands of branches keeps a bounded reload.
-const MAX_HEADS_PER_SOURCE = 100
 
 // Branches without CI are skipped while looking for heads; the cap keeps a repo with few CI branches from scanning all of them.
 const MAX_BRANCHES_SCANNED_FOR_HEADS = 1000
