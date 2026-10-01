@@ -18,7 +18,9 @@
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
-    "wipe:dev": "bash scripts/wipe-dev.sh"
+    "wipe:dev": "bash scripts/wipe-dev.sh",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@convex-dev/aggregate": "^0.3.1",
@@ -56,6 +58,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "latest",
     "@tanstack/eslint-config": "latest",
@@ -67,6 +70,7 @@
     "eslint": "^9.20.0",
     "playwright-core": "1.62.1",
     "prettier": "^3.8.1",
+    "testcontainers": "^12.2.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0"
   },

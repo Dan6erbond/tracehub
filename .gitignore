@@ -17,3 +17,7 @@ _generated/
 
 # Self-hosted Playwright trace viewer, copied from playwright-core
 public/trace
+
+# Playwright
+playwright-report
+test-results
