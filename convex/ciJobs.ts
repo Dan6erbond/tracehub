@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ConvexError } from 'convex/values'
-import { asyncMap, pruneNull } from 'convex-helpers'
+import { asyncMap } from 'convex-helpers'
 import { stream } from 'convex-helpers/server/stream'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
@@ -8,12 +8,10 @@ import schema from './schema'
 import { findInRepoQuery } from './lib/findInRepo'
 import { repoQuery, zInternalMutation, zInternalQuery } from './lib/functions'
 import { insertAndGet, replaceOrInsert, uniqueBy } from './lib/upsert'
-import { withRunDetails } from './runs'
 import { ciJobSchema } from '../src/lib/schemas/ci-job'
 import { httpUrlSchema } from '../src/lib/schemas/url'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
-import type { RunDetail } from './runs'
 
 // Jobs are synced for the most recently active heads only, so a repo with thousands of branches keeps a bounded reload.
 const MAX_HEADS_PER_SOURCE = 100
@@ -21,28 +19,45 @@ const MAX_HEADS_PER_SOURCE = 100
 // Branches without CI are skipped while looking for heads; the cap keeps a repo with few CI branches from scanning all of them.
 const MAX_BRANCHES_SCANNED_FOR_HEADS = 1000
 
-export type CiJobWithRuns = Doc<'ciJobs'> & { runs: Array<RunDetail> }
+// The host bounds the jobs of a commit or pipeline; listings returned to the frontend still stop here.
+const MAX_JOBS_PER_LIST = 200
 
-/** Jobs of one commit by name. */
+export type CiJobWithRunCount = Doc<'ciJobs'> & { runCount: number }
+export type CiJobListing = {
+  jobs: Array<CiJobWithRunCount>
+  // The host reported more jobs than the list holds.
+  truncated: boolean
+}
+
+/** Jobs of one commit by name; all of them unless `limit` is given. */
 export const listAtSha = zInternalQuery({
-  args: { repoId: zid('repos'), sha: z.string() },
-  handler: (ctx, { repoId, sha }) =>
-    ctx.db
+  args: {
+    repoId: zid('repos'),
+    sha: z.string(),
+    limit: z.number().optional(),
+    outsidePipelines: z.boolean().optional(),
+  },
+  handler: (ctx, { repoId, sha, limit, outsidePipelines }) => {
+    const atSha = ctx.db
       .query('ciJobs')
       .withIndex('by_repo_sha_name', (q) =>
         q.eq('repoId', repoId).eq('sha', sha),
       )
-      .collect(),
+    const jobs = outsidePipelines
+      ? atSha.filter((q) => q.eq(q.field('pipelineId'), undefined))
+      : atSha
+    return limit === undefined ? jobs.collect() : jobs.take(limit)
+  },
 })
 
-/** Jobs of one pipeline by name. */
+/** Jobs of one pipeline by name, one more than `MAX_JOBS_PER_LIST` so callers can tell the list was cut. */
 export const listForPipeline = zInternalQuery({
   args: { pipelineId: zid('ciPipelines') },
   handler: (ctx, { pipelineId }) =>
     ctx.db
       .query('ciJobs')
       .withIndex('by_pipeline', (q) => q.eq('pipelineId', pipelineId))
-      .collect(),
+      .take(MAX_JOBS_PER_LIST + 1),
 })
 
 export const findInRepo = findInRepoQuery('ciJobs')
@@ -236,19 +251,28 @@ export const upsertJobs = zInternalMutation({
         found?.matchedBy === 'externalId' ? [found.job._id] : [],
       ),
     )
-    await asyncMap(batch, ({ job, pipelineId, found }) => {
+    await asyncMap(batch, async ({ job, pipelineId, found }) => {
       const claimable =
         found?.matchedBy === 'name' && !claimed.has(found.job._id)
       if (claimable) claimed.add(found.job._id)
       const existing =
         found?.matchedBy === 'externalId' || claimable ? found.job : null
-      return replaceOrInsert(ctx, 'ciJobs', existing, {
+      const stored = await replaceOrInsert(ctx, 'ciJobs', existing, {
         repoId,
         ...job,
         // A pipeline an upload attached stays when the host reports the job without one.
         pipelineId: pipelineId ?? existing?.pipelineId,
         syncedAt,
       })
+      if (
+        existing &&
+        stored.pipelineId !== undefined &&
+        stored.pipelineId !== existing.pipelineId
+      )
+        await ctx.runMutation(internal.runs.attachJobRuns, {
+          jobId: stored._id,
+          pipelineId: stored.pipelineId,
+        })
     })
   },
 })
@@ -349,6 +373,10 @@ export const ensureJob = zInternalMutation({
     if (pipelineId === undefined || existing.pipelineId !== undefined)
       return existing
     await ctx.db.patch('ciJobs', existing._id, { pipelineId })
+    await ctx.runMutation(internal.runs.attachJobRuns, {
+      jobId: existing._id,
+      pipelineId,
+    })
     return { ...existing, pipelineId }
   },
 })
@@ -375,56 +403,43 @@ export const pruneJobs = zInternalMutation({
   },
 })
 
-/** Attaches to each job the runs that reference it. */
-export const attachRuns = (
+const withRunCounts = async (
+  ctx: QueryCtx,
   jobs: Array<Doc<'ciJobs'>>,
-  runs: Array<RunDetail>,
-): Array<CiJobWithRuns> =>
-  jobs.map((job) => ({
+): Promise<CiJobListing> => ({
+  jobs: await asyncMap(jobs.slice(0, MAX_JOBS_PER_LIST), async (job) => ({
     ...job,
-    runs: runs.filter((run) => run.jobId === job._id),
-  }))
+    runCount: await ctx.runQuery(internal.runs.countForJob, { jobId: job._id }),
+  })),
+  truncated: jobs.length > MAX_JOBS_PER_LIST,
+})
 
-const withRuns = (
-  ctx: QueryCtx,
-  jobs: Array<Doc<'ciJobs'>>,
-  pipelines: Array<Doc<'ciPipelines'>>,
-): Promise<Array<CiJobWithRuns>> =>
-  asyncMap(jobs, async (job) => {
-    const runs: Array<Doc<'runs'>> = await ctx.runQuery(
-      internal.runs.listForJob,
-      { jobId: job._id },
-    )
-    return {
-      ...job,
-      runs: await asyncMap(runs, (run) =>
-        withRunDetails(ctx, run, { jobs: [job], pipelines }),
-      ),
-    }
-  })
-
-const findPipelines = async (
-  ctx: QueryCtx,
-  repoId: Id<'repos'>,
-  jobs: Array<Doc<'ciJobs'>>,
-): Promise<Array<Doc<'ciPipelines'>>> =>
-  pruneNull(
-    await asyncMap(
-      new Set(jobs.flatMap(({ pipelineId }) => pipelineId ?? [])),
-      (id): Promise<Doc<'ciPipelines'> | null> =>
-        ctx.runQuery(internal.ciPipelines.findInRepo, { repoId, id }),
-    ),
-  )
-
-/** Jobs of one commit, each with the trace runs uploaded for it. */
-export const listJobs = repoQuery({
+/** Jobs of one commit that belong to no pipeline (commit statuses, checks of other CI apps), each with the number of trace runs uploaded for it. */
+export const listOtherChecks = repoQuery({
   args: { sha: z.string() },
-  handler: async (ctx, { repoId, sha }): Promise<Array<CiJobWithRuns>> => {
+  handler: async (ctx, { repoId, sha }): Promise<CiJobListing> => {
     const jobs: Array<Doc<'ciJobs'>> = await ctx.runQuery(
       internal.ciJobs.listAtSha,
-      { repoId, sha },
+      { repoId, sha, limit: MAX_JOBS_PER_LIST + 1, outsidePipelines: true },
     )
-    return withRuns(ctx, jobs, await findPipelines(ctx, repoId, jobs))
+    return withRunCounts(ctx, jobs)
+  },
+})
+
+/** Jobs of one pipeline, each with the number of trace runs uploaded for it. */
+export const listPipelineJobs = repoQuery({
+  args: { pipelineId: zid('ciPipelines') },
+  handler: async (ctx, { repoId, pipelineId }): Promise<CiJobListing> => {
+    const pipeline: Doc<'ciPipelines'> | null = await ctx.runQuery(
+      internal.ciPipelines.findInRepo,
+      { repoId, id: pipelineId },
+    )
+    if (!pipeline) return { jobs: [], truncated: false }
+    const jobs: Array<Doc<'ciJobs'>> = await ctx.runQuery(
+      internal.ciJobs.listForPipeline,
+      { pipelineId },
+    )
+    return withRunCounts(ctx, jobs)
   },
 })
 
@@ -434,7 +449,7 @@ export const getJob = repoQuery({
     ctx,
     { repoId, jobId },
   ): Promise<{
-    job: CiJobWithRuns
+    job: CiJobWithRunCount
     pipeline: Doc<'ciPipelines'> | null
   } | null> => {
     const job: Doc<'ciJobs'> | null = await ctx.runQuery(
@@ -442,12 +457,16 @@ export const getJob = repoQuery({
       { repoId, id: jobId },
     )
     if (!job) return null
-    const [pipeline = null] = await findPipelines(ctx, repoId, [job])
-    const [withRunsOfJob] = await withRuns(
-      ctx,
-      [job],
-      pipeline ? [pipeline] : [],
-    )
-    return { job: withRunsOfJob, pipeline }
+    const pipeline: Doc<'ciPipelines'> | null =
+      job.pipelineId === undefined
+        ? null
+        : await ctx.runQuery(internal.ciPipelines.findInRepo, {
+            repoId,
+            id: job.pipelineId,
+          })
+    const runCount: number = await ctx.runQuery(internal.runs.countForJob, {
+      jobId,
+    })
+    return { job: { ...job, runCount }, pipeline }
   },
 })

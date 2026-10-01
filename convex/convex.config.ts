@@ -17,5 +17,7 @@ app.use(migrations)
 app.use(aggregate, { name: 'tracesByRun' })
 app.use(aggregate, { name: 'tracesByBranch' })
 app.use(aggregate, { name: 'tracesByPull' })
+app.use(aggregate, { name: 'tracesByPipeline' })
+app.use(aggregate, { name: 'runsByJob' })
 
 export default app

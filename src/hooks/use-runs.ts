@@ -15,6 +15,23 @@ export const useRuns = (repoId: Id<'repos'>, scope: RunScope) =>
     { initialNumItems: RUNS_PAGE_SIZE },
   )
 
+export const useJobRuns = (repoId: Id<'repos'>, jobId: Id<'ciJobs'>) =>
+  usePaginatedQuery(
+    api.runs.listJobRuns,
+    { repoId, jobId },
+    { initialNumItems: RUNS_PAGE_SIZE },
+  )
+
+export const usePipelineRuns = (
+  repoId: Id<'repos'>,
+  pipelineId: Id<'ciPipelines'>,
+) =>
+  usePaginatedQuery(
+    api.runs.listPipelineRuns,
+    { repoId, pipelineId },
+    { initialNumItems: RUNS_PAGE_SIZE },
+  )
+
 export const runQueryOptions = (repoId: Id<'repos'>, runId: Id<'runs'>) =>
   convexQuery(api.runs.getRun, { repoId, runId })
 

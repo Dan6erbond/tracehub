@@ -6,6 +6,7 @@ import { stream } from 'convex-helpers/server/stream'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
 import schema from './schema'
+import { EMPTY_PAGE } from './lib/emptyPage'
 import { findInRepoQuery } from './lib/findInRepo'
 import {
   repoMutation,
@@ -13,6 +14,7 @@ import {
   zInternalMutation,
   zInternalQuery,
 } from './lib/functions'
+import { runsByJob } from './lib/runAggregates'
 import { scopedStream } from './lib/scopedStream'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import {
@@ -22,7 +24,7 @@ import {
 } from '../src/lib/schemas/run'
 import type { ResolvedRunScope } from '../src/lib/schemas/run'
 import type { Doc, Id } from './_generated/dataModel'
-import type { QueryCtx } from './_generated/server'
+import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { TraceCounts } from '../src/lib/schemas/trace'
 
 export type RunWithCounts = Doc<'runs'> & { traceCounts: TraceCounts }
@@ -31,7 +33,7 @@ export type RunDetail = RunWithCounts & {
   pipeline: Doc<'ciPipelines'> | null
 }
 
-export const withTraceCounts = async (
+const withTraceCounts = async (
   ctx: QueryCtx,
   run: Doc<'runs'>,
 ): Promise<RunWithCounts> => {
@@ -78,15 +80,6 @@ export const withRunDetails = async (
 
 export const findInRepo = findInRepoQuery('runs')
 
-export const listForPipeline = zInternalQuery({
-  args: { pipelineId: zid('ciPipelines') },
-  handler: (ctx, { pipelineId }) =>
-    ctx.db
-      .query('runs')
-      .withIndex('by_pipeline', (q) => q.eq('pipelineId', pipelineId))
-      .collect(),
-})
-
 export const existsOnBranch = zInternalQuery({
   args: { repoId: zid('repos'), branch: z.string() },
   handler: async (ctx, { repoId, branch }) =>
@@ -98,13 +91,9 @@ export const existsOnBranch = zInternalQuery({
       .first()) !== null,
 })
 
-export const listForJob = zInternalQuery({
+export const countForJob = zInternalQuery({
   args: { jobId: zid('ciJobs') },
-  handler: (ctx, { jobId }) =>
-    ctx.db
-      .query('runs')
-      .withIndex('by_job', (q) => q.eq('jobId', jobId))
-      .collect(),
+  handler: (ctx, { jobId }) => runsByJob.count(ctx, { namespace: jobId }),
 })
 
 export const existsForJob = zInternalQuery({
@@ -187,6 +176,67 @@ export const listRuns = repoQuery({
     )
     return scoped
       .map((run) => withRunDetails(ctx, run))
+      .paginate(paginationOpts)
+  },
+})
+
+/** Runs uploaded for one job, newest first. */
+export const listJobRuns = repoQuery({
+  args: { jobId: zid('ciJobs'), paginationOpts: paginationOptsSchema },
+  handler: async (
+    ctx,
+    { repoId, jobId, paginationOpts },
+  ): Promise<PaginationResult<RunDetail>> => {
+    const job: Doc<'ciJobs'> | null = await ctx.runQuery(
+      internal.ciJobs.findInRepo,
+      { repoId, id: jobId },
+    )
+    if (!job) return EMPTY_PAGE
+    const pipeline: Doc<'ciPipelines'> | null =
+      job.pipelineId === undefined
+        ? null
+        : await ctx.runQuery(internal.ciPipelines.findInRepo, {
+            repoId,
+            id: job.pipelineId,
+          })
+    return stream(ctx.db, schema)
+      .query('runs')
+      .withIndex('by_job', (q) => q.eq('jobId', jobId))
+      .order('desc')
+      .map((run) =>
+        withRunDetails(ctx, run, {
+          jobs: [job],
+          pipelines: pipeline ? [pipeline] : [],
+        }),
+      )
+      .paginate(paginationOpts)
+  },
+})
+
+/** Runs uploaded for one pipeline, whether or not they name a job, newest first. */
+export const listPipelineRuns = repoQuery({
+  args: {
+    pipelineId: zid('ciPipelines'),
+    paginationOpts: paginationOptsSchema,
+  },
+  handler: async (
+    ctx,
+    { repoId, pipelineId, paginationOpts },
+  ): Promise<PaginationResult<RunDetail>> => {
+    const pipeline: Doc<'ciPipelines'> | null = await ctx.runQuery(
+      internal.ciPipelines.findInRepo,
+      { repoId, id: pipelineId },
+    )
+    if (!pipeline) return EMPTY_PAGE
+    const jobs: Array<Doc<'ciJobs'>> = await ctx.runQuery(
+      internal.ciJobs.listForPipeline,
+      { pipelineId },
+    )
+    return stream(ctx.db, schema)
+      .query('runs')
+      .withIndex('by_pipeline', (q) => q.eq('pipelineId', pipelineId))
+      .order('desc')
+      .map((run) => withRunDetails(ctx, run, { jobs, pipelines: [pipeline] }))
       .paginate(paginationOpts)
   },
 })
@@ -312,6 +362,34 @@ export const getOrCreateRun = zInternalMutation({
   },
 })
 
+// Runs of one job rarely number more than a few, so one batch normally covers them all.
+const ATTACH_BATCH_SIZE = 100
+
+/** Points a run at a pipeline and gives it the pipeline's branch and pull request where it states none. Its traces follow in batches. */
+const attachRun = async (
+  ctx: Pick<MutationCtx, 'db' | 'scheduler'>,
+  run: Doc<'runs'>,
+  pipeline: Doc<'ciPipelines'>,
+): Promise<void> => {
+  const branch = run.branch ?? pipeline.branch
+  const prNumber = run.prNumber ?? pipeline.prNumber
+  if (
+    run.pipelineId === pipeline._id &&
+    branch === run.branch &&
+    prNumber === run.prNumber
+  )
+    return
+  await ctx.db.patch('runs', run._id, {
+    pipelineId: pipeline._id,
+    branch,
+    prNumber,
+  })
+  // A run can hold thousands of traces, so they follow in bounded batches.
+  await ctx.scheduler.runAfter(0, internal.traces.syncRunScope, {
+    runId: run._id,
+  })
+}
+
 /** Gives the runs of pipelines the branch and pull request the host reports for them, keeping what an upload stated explicitly. */
 export const adoptPipelines = zInternalMutation({
   args: { pipelineIds: z.array(zid('ciPipelines')) },
@@ -327,17 +405,35 @@ export const adoptPipelines = zInternalMutation({
         .query('runs')
         .withIndex('by_pipeline', (q) => q.eq('pipelineId', pipelineId))
         .collect()
-      await asyncMap(runs, async (run) => {
-        const branch = run.branch ?? pipeline.branch
-        const prNumber = run.prNumber ?? pipeline.prNumber
-        if (branch === run.branch && prNumber === run.prNumber) return
-        await ctx.db.patch('runs', run._id, { branch, prNumber })
-        // A run can hold thousands of traces, so they follow in bounded batches.
-        await ctx.scheduler.runAfter(0, internal.traces.syncRunScope, {
-          runId: run._id,
-        })
-      })
+      await asyncMap(runs, (run) => attachRun(ctx, run, pipeline))
     })
+  },
+})
+
+/**
+ * Moves the runs of a job to the pipeline the job now belongs to (an upload attached it, or the host reported it in another),
+ * so counts and lists by pipeline agree with those by job and a repeated upload finds its run again.
+ */
+export const attachJobRuns = zInternalMutation({
+  args: {
+    jobId: zid('ciJobs'),
+    pipelineId: zid('ciPipelines'),
+    cursor: z.string().nullable().optional(),
+  },
+  handler: async (ctx, { jobId, pipelineId, cursor }): Promise<void> => {
+    const pipeline = await ctx.db.get('ciPipelines', pipelineId)
+    if (!pipeline) return
+    const { page, isDone, continueCursor } = await ctx.db
+      .query('runs')
+      .withIndex('by_job', (q) => q.eq('jobId', jobId))
+      .paginate({ numItems: ATTACH_BATCH_SIZE, cursor: cursor ?? null })
+    await asyncMap(page, (run) => attachRun(ctx, run, pipeline))
+    if (!isDone)
+      await ctx.scheduler.runAfter(0, internal.runs.attachJobRuns, {
+        jobId,
+        pipelineId,
+        cursor: continueCursor,
+      })
   },
 })
 

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { asyncMap } from 'convex-helpers'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
+import { EMPTY_PAGE } from './lib/emptyPage'
 import { findInRepoQuery } from './lib/findInRepo'
 import { repoMutation, repoQuery, zInternalMutation } from './lib/functions'
 import {
@@ -22,7 +23,7 @@ export const generateUploadUrl = repoMutation({
   handler: (ctx) => ctx.storage.generateUploadUrl(),
 })
 
-// Each trace of a run rewrites three aggregates, so a run that changes branch or pull request moves its traces in batches of this size.
+// Each trace of a run rewrites several aggregates, so a run that changes branch, pull request or pipeline moves its traces in batches of this size.
 const SCOPE_SYNC_BATCH_SIZE = 100
 
 export const insertTraces = zInternalMutation({
@@ -30,7 +31,7 @@ export const insertTraces = zInternalMutation({
   handler: async (ctx, { runId, traces }) => {
     const run = await ctx.db.get('runs', runId)
     if (!run) throw new ConvexError('Run not found')
-    const { repoId, branch, prNumber } = run
+    const { repoId, branch, prNumber, pipelineId } = run
     // Checked together up front, since a file can back one trace and the checks below run in parallel.
     if (new Set(traces.map(({ storageId }) => storageId)).size < traces.length)
       throw new ConvexError('A file can back only one trace')
@@ -53,13 +54,14 @@ export const insertTraces = zInternalMutation({
         runId,
         branch,
         prNumber,
+        pipelineId,
         ...trace,
         size: files[index].size,
       })
   },
 })
 
-/** Copies the branch and pull request of a run onto its traces, which the trace aggregates are keyed by. */
+/** Copies the branch, pull request and pipeline of a run onto its traces, which the trace aggregates are keyed by. */
 export const syncRunScope = zInternalMutation({
   args: { runId: zid('runs'), cursor: z.string().nullable().optional() },
   handler: async (ctx, { runId, cursor }): Promise<void> => {
@@ -70,10 +72,15 @@ export const syncRunScope = zInternalMutation({
       .withIndex('by_run', (q) => q.eq('runId', runId))
       .paginate({ numItems: SCOPE_SYNC_BATCH_SIZE, cursor: cursor ?? null })
     for (const trace of page)
-      if (trace.branch !== run.branch || trace.prNumber !== run.prNumber)
+      if (
+        trace.branch !== run.branch ||
+        trace.prNumber !== run.prNumber ||
+        trace.pipelineId !== run.pipelineId
+      )
         await ctx.db.patch('traces', trace._id, {
           branch: run.branch,
           prNumber: run.prNumber,
+          pipelineId: run.pipelineId,
         })
     if (!isDone)
       await ctx.scheduler.runAfter(0, internal.traces.syncRunScope, {
@@ -120,7 +127,7 @@ export const listTraces = repoQuery({
       internal.runs.findInRepo,
       { repoId, id: runId },
     )
-    if (!run) return { page: [], isDone: true, continueCursor: '' }
+    if (!run) return EMPTY_PAGE
     return ctx.db
       .query('traces')
       .withIndex('by_run', (q) => q.eq('runId', runId))

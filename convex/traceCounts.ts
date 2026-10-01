@@ -3,6 +3,7 @@ import { zid } from 'convex-helpers/server/zod4'
 import { zInternalQuery } from './lib/functions'
 import {
   tracesByBranch,
+  tracesByPipeline,
   tracesByPull,
   tracesByRun,
 } from './lib/traceAggregates'
@@ -31,6 +32,17 @@ export const countRunTraces = zInternalQuery({
     toCounts((status) =>
       tracesByRun.count(ctx, {
         namespace: runId,
+        bounds: { prefix: [status] },
+      }),
+    ),
+})
+
+export const countPipelineTraces = zInternalQuery({
+  args: { pipelineId: zid('ciPipelines') },
+  handler: (ctx, { pipelineId }) =>
+    toCounts((status) =>
+      tracesByPipeline.count(ctx, {
+        namespace: pipelineId,
         bounds: { prefix: [status] },
       }),
     ),

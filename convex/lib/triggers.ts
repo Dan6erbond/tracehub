@@ -1,7 +1,13 @@
 import { asyncMap } from 'convex-helpers'
 import { Triggers } from 'convex-helpers/server/triggers'
 import { repoActivityAt } from './repoActivity'
-import { tracesByBranch, tracesByPull, tracesByRun } from './traceAggregates'
+import { runsByJob } from './runAggregates'
+import {
+  tracesByBranch,
+  tracesByPipeline,
+  tracesByPull,
+  tracesByRun,
+} from './traceAggregates'
 import type { DataModel } from '../_generated/dataModel'
 
 export const triggers = new Triggers<DataModel>()
@@ -26,6 +32,23 @@ triggers.register('repos', async (ctx, change) => {
 })
 
 triggers.register('traces', tracesByRun.trigger())
+
+// A run that gets a pipeline (see runs.attachJobRuns) moves its traces between pipeline namespaces on update; traces without one are not aggregated.
+triggers.register('traces', async (ctx, { oldDoc, newDoc }) => {
+  if (oldDoc && newDoc && oldDoc.pipelineId === newDoc.pipelineId) return
+  if (oldDoc?.pipelineId !== undefined)
+    await tracesByPipeline.deleteIfExists(ctx, oldDoc)
+  if (newDoc?.pipelineId !== undefined)
+    await tracesByPipeline.insertIfDoesNotExist(ctx, newDoc)
+})
+
+// A run's job is fixed when it is created (only its pipeline changes later), so only inserts and deletes touch this aggregate.
+const jobTrigger = runsByJob.trigger()
+triggers.register('runs', async (ctx, change) => {
+  if (change.operation === 'update') return
+  const run = change.newDoc ?? change.oldDoc
+  if (run.jobId !== undefined) await jobTrigger(ctx, change)
+})
 
 // Traces without a branch or pull request are not part of those aggregates, so the counts never mix them in under a placeholder key.
 // Idempotent because a run adopts the branch and pull request of its pipeline after the fact, which moves its traces into these aggregates on update.

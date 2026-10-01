@@ -3,9 +3,10 @@ import { CiStatusBadge } from '#/components/ci-status-badge'
 import { CommitTimestamp } from '#/components/commit-timestamp'
 import { ExternalTextLink } from '#/components/external-text-link'
 import { PageHeader } from '#/components/page-header'
-import { RunCard } from '#/components/run-card'
+import { RunList } from '#/components/run-list'
 import { SectionHeading } from '#/components/section-heading'
 import { useJob } from '#/hooks/use-ci-jobs'
+import { useJobRuns } from '#/hooks/use-runs'
 import { formatElapsed } from '#/lib/format'
 import { jobUrl } from '#/lib/git-host'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
@@ -19,6 +20,7 @@ export function JobPage({
 }) {
   const repoId = repo._id
   const { job, pipeline } = useJob(repoId, jobId)
+  const runs = useJobRuns(repoId, jobId)
   const elapsed = formatElapsed(job.startedAt, job.completedAt)
 
   return (
@@ -54,15 +56,8 @@ export function JobPage({
           </>
         }
       />
-      <SectionHeading>Trace runs</SectionHeading>
-      {job.runs.length === 0 && (
-        <p className="text-muted-foreground">
-          No traces uploaded for this job.
-        </p>
-      )}
-      {job.runs.map((run) => (
-        <RunCard key={run._id} run={run} repo={repo} />
-      ))}
+      <SectionHeading>Trace runs ({job.runCount})</SectionHeading>
+      <RunList repo={repo} query={runs} />
     </div>
   )
 }

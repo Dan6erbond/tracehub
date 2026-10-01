@@ -1,6 +1,6 @@
 import { CiJobList } from '#/components/ci-job-list'
 import { PipelineList } from '#/components/pipeline-list'
-import { RunList } from '#/components/run-list'
+import { ScopeRunList } from '#/components/scope-run-list'
 import { SectionHeading } from '#/components/section-heading'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
@@ -42,7 +42,7 @@ export function ScopeActivity({
       </TabsContent>
       <TabsContent value="runs" className="flex flex-col gap-4">
         {counts.data && <TraceCountsBadges counts={counts.data} />}
-        <RunList repo={repo} scope={scope} />
+        <ScopeRunList repo={repo} scope={scope} />
       </TabsContent>
     </Tabs>
   )

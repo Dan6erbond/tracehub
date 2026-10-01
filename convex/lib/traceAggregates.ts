@@ -13,6 +13,16 @@ export const tracesByRun = new TableAggregate<{
   sortKey: (trace) => [trace.status, trace._creationTime],
 })
 
+export const tracesByPipeline = new TableAggregate<{
+  Namespace: Id<'ciPipelines'> | undefined
+  Key: [TraceStatus, number]
+  DataModel: DataModel
+  TableName: 'traces'
+}>(components.tracesByPipeline, {
+  namespace: (trace) => trace.pipelineId,
+  sortKey: (trace) => [trace.status, trace._creationTime],
+})
+
 export const tracesByBranch = new TableAggregate<{
   Namespace: Id<'repos'>
   Key: [string, TraceStatus, number]

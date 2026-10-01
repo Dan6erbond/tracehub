@@ -7,11 +7,12 @@ import { ErrorAlert } from '#/components/error-alert'
 import { ExternalTextLink } from '#/components/external-text-link'
 import { PageHeader } from '#/components/page-header'
 import { PullRequestBadge } from '#/components/pull-request-badge'
-import { RunCard } from '#/components/run-card'
+import { RunList } from '#/components/run-list'
 import { SectionHeading } from '#/components/section-heading'
 import { TraceCountsBadges } from '#/components/trace-counts-badges'
 import { Skeleton } from '#/components/ui/skeleton'
 import { usePipeline } from '#/hooks/use-ci-pipelines'
+import { usePipelineRuns } from '#/hooks/use-runs'
 import { formatElapsed } from '#/lib/format'
 import { pipelineUrl } from '#/lib/git-host'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
@@ -24,10 +25,11 @@ export function PipelinePage({
   pipelineId: Id<'ciPipelines'>
 }) {
   const repoId = repo._id
-  const { pipeline, loadingJobs, loadJobsError } = usePipeline(
+  const { pipeline, jobs, loadingJobs, loadJobsError } = usePipeline(
     repoId,
     pipelineId,
   )
+  const runs = usePipelineRuns(repoId, pipelineId)
   const elapsed = formatElapsed(pipeline.startedAt, pipeline.completedAt)
 
   return (
@@ -71,23 +73,21 @@ export function PipelinePage({
       </PageHeader>
       <SectionHeading>Jobs</SectionHeading>
       {loadingJobs && <Skeleton className="h-24 w-full" />}
-      {pipeline.jobs.length > 0 && (
-        <CiJobTable repo={repo} jobs={pipeline.jobs} />
+      {jobs.data && jobs.data.jobs.length > 0 && (
+        <CiJobTable
+          repo={repo}
+          jobs={jobs.data.jobs}
+          truncated={jobs.data.truncated}
+        />
       )}
       <ErrorAlert error={loadJobsError}>
         Could not load the jobs from the Git host.
       </ErrorAlert>
-      {!loadingJobs && !loadJobsError && pipeline.jobs.length === 0 && (
+      {jobs.data?.jobs.length === 0 && !loadingJobs && !loadJobsError && (
         <p className="text-muted-foreground">No jobs reported.</p>
       )}
-      {pipeline.unlinkedRuns.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <SectionHeading>Other trace runs</SectionHeading>
-          {pipeline.unlinkedRuns.map((run) => (
-            <RunCard key={run._id} run={run} repo={repo} />
-          ))}
-        </div>
-      )}
+      <SectionHeading>Trace runs</SectionHeading>
+      <RunList repo={repo} query={runs} />
     </div>
   )
 }

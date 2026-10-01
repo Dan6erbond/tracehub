@@ -4,8 +4,13 @@ import { useSuspenseEntity } from '#/hooks/use-suspense-entity'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
-export const useCiJobs = (repoId: Id<'repos'>, sha: string) =>
-  useQuery(convexQuery(api.ciJobs.listJobs, { repoId, sha }))
+export const useOtherChecks = (repoId: Id<'repos'>, sha: string) =>
+  useQuery(convexQuery(api.ciJobs.listOtherChecks, { repoId, sha }))
+
+export const usePipelineJobs = (
+  repoId: Id<'repos'>,
+  pipelineId: Id<'ciPipelines'>,
+) => useQuery(convexQuery(api.ciJobs.listPipelineJobs, { repoId, pipelineId }))
 
 export const jobQueryOptions = (repoId: Id<'repos'>, jobId: Id<'ciJobs'>) =>
   convexQuery(api.ciJobs.getJob, { repoId, jobId })

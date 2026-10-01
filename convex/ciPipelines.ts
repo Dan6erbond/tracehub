@@ -17,26 +17,16 @@ import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
 import { gitProviders } from './lib/gitProviders'
 import { scopedStream } from './lib/scopedStream'
 import { insertAndGet, replaceOrInsert, uniqueBy } from './lib/upsert'
-import { withRunDetails, withTraceCounts } from './runs'
-import { attachRuns } from './ciJobs'
 import { ciPipelineSchema } from '../src/lib/schemas/ci-pipeline'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { runScopeSchema } from '../src/lib/schemas/run'
 import { httpUrlSchema } from '../src/lib/schemas/url'
-import { sumTraceCounts } from '../src/lib/trace-counts'
 import type { TraceCounts } from '../src/lib/schemas/trace'
 import type { Doc } from './_generated/dataModel'
 import type { QueryCtx } from './_generated/server'
-import type { CiJobWithRuns } from './ciJobs'
-import type { RunDetail, RunWithCounts } from './runs'
 
 export type PipelineWithCounts = Doc<'ciPipelines'> & {
   traceCounts: TraceCounts
-}
-type PipelineDetail = PipelineWithCounts & {
-  jobs: Array<CiJobWithRuns>
-  // Runs of the pipeline that name no job.
-  unlinkedRuns: Array<RunDetail>
 }
 
 export const findInRepo = findInRepoQuery('ciPipelines')
@@ -122,27 +112,15 @@ export const upsertPipelines = zInternalMutation({
   },
 })
 
-const withPipelineCounts = (
-  pipeline: Doc<'ciPipelines'>,
-  runs: Array<RunWithCounts>,
-): PipelineWithCounts => ({
-  ...pipeline,
-  traceCounts: sumTraceCounts(runs.map((run) => run.traceCounts)),
-})
-
 const withCounts = async (
   ctx: QueryCtx,
   pipeline: Doc<'ciPipelines'>,
-): Promise<PipelineWithCounts> => {
-  const runs: Array<Doc<'runs'>> = await ctx.runQuery(
-    internal.runs.listForPipeline,
-    { pipelineId: pipeline._id },
-  )
-  return withPipelineCounts(
-    pipeline,
-    await asyncMap(runs, (run) => withTraceCounts(ctx, run)),
-  )
-}
+): Promise<PipelineWithCounts> => ({
+  ...pipeline,
+  traceCounts: await ctx.runQuery(internal.traceCounts.countPipelineTraces, {
+    pipelineId: pipeline._id,
+  }),
+})
 
 /** Pipelines of a branch plus those of its pull requests, each once; without a scope, every pipeline of the repo. All newest first. */
 export const listPipelines = repoQuery({
@@ -192,25 +170,12 @@ export const getPipeline = repoQuery({
   handler: async (
     ctx,
     { repoId, pipelineId },
-  ): Promise<PipelineDetail | null> => {
+  ): Promise<PipelineWithCounts | null> => {
     const pipeline: Doc<'ciPipelines'> | null = await ctx.runQuery(
       internal.ciPipelines.findInRepo,
       { repoId, id: pipelineId },
     )
-    if (!pipeline) return null
-    const [jobs, pipelineRuns]: [Array<Doc<'ciJobs'>>, Array<Doc<'runs'>>] =
-      await Promise.all([
-        ctx.runQuery(internal.ciJobs.listForPipeline, { pipelineId }),
-        ctx.runQuery(internal.runs.listForPipeline, { pipelineId }),
-      ])
-    const runs = await asyncMap(pipelineRuns, (run) =>
-      withRunDetails(ctx, run, { jobs, pipelines: [pipeline] }),
-    )
-    return {
-      ...withPipelineCounts(pipeline, runs),
-      jobs: attachRuns(jobs, runs),
-      unlinkedRuns: runs.filter((run) => run.jobId === undefined),
-    }
+    return pipeline && withCounts(ctx, pipeline)
   },
 })
 

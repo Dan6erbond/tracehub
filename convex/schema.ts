@@ -101,6 +101,7 @@ export default defineSchema({
     // copied from the run (see traces.syncRunScope for when the run changes them) so aggregates can be keyed by them
     branch: v.optional(v.string()),
     prNumber: v.optional(v.number()),
+    pipelineId: v.optional(v.id('ciPipelines')),
     ...zodToConvexFields(traceSchema.shape),
   })
     .index('by_run', ['runId'])

@@ -3,7 +3,7 @@
 # `convex import --replace-all` isn't documented to reach component tables, hence the per-table loop.
 set -euo pipefail
 
-COMPONENTS=(betterAuth migrations tracesByRun tracesByBranch tracesByPull)
+COMPONENTS=(betterAuth migrations tracesByRun tracesByBranch tracesByPull tracesByPipeline runsByJob)
 
 empty=$(mktemp)
 trap 'rm -f "$empty"' EXIT
