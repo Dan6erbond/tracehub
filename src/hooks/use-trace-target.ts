@@ -1,6 +1,7 @@
-import { useBranch } from '#/hooks/use-branches'
-import { usePullRequest } from '#/hooks/use-pull-requests'
-import { useRun } from '#/hooks/use-runs'
+import { useOptionalBranch } from '#/hooks/use-branches'
+import { useOptionalPullRequest } from '#/hooks/use-pull-requests'
+import { useOptionalRun } from '#/hooks/use-runs'
+import { targetBranch } from '#/lib/schemas/trace-target'
 import type { Doc } from '../../convex/_generated/dataModel'
 import type { TraceTargetSearch } from '#/lib/schemas/trace-target'
 
@@ -9,29 +10,33 @@ export type TraceTarget =
   | { kind: 'pull'; number: number; sha: string; title: string }
   | { kind: 'run'; run: Doc<'runs'> }
 
-/** Resolves the upload search params to a target with the data the form prefills; `undefined` while loading, `null` when it does not exist. */
+/**
+ * Resolves the upload search params to a target with the data the form prefills; `undefined` while loading.
+ * The route loader guarantees a run or pull request exists; a branch that is not stored yet is a valid target without a head sha.
+ */
 export function useTraceTarget(
   repo: Doc<'repos'>,
-  { branch, pull, job }: TraceTargetSearch,
-): TraceTarget | null | undefined {
-  const branchName = branch ?? repo.defaultBranch ?? ''
-  const run = useRun(repo._id, job)
-  const pullRequest = usePullRequest(repo._id, job ? undefined : pull)
-  const branchDoc = useBranch(repo._id, job || pull ? undefined : branchName)
+  search: TraceTargetSearch,
+): TraceTarget | undefined {
+  const { pull, job } = search
+  const branchName = targetBranch(search, repo) ?? ''
+  const run = useOptionalRun(repo._id, job)
+  const pullRequest = useOptionalPullRequest(repo._id, job ? undefined : pull)
+  const branchDoc = useOptionalBranch(
+    repo._id,
+    job || pull ? undefined : branchName,
+  )
 
-  if (job)
-    return run.isPending
-      ? undefined
-      : run.data && { kind: 'run', run: run.data }
+  if (job) return run.data ? { kind: 'run', run: run.data } : undefined
   if (pull)
-    return pullRequest.isPending
-      ? undefined
-      : pullRequest.data && {
+    return pullRequest.data
+      ? {
           kind: 'pull',
           number: pull,
           sha: pullRequest.data.headSha,
           title: pullRequest.data.title,
         }
+      : undefined
   if (branchDoc.isPending) return undefined
   return {
     kind: 'branch',

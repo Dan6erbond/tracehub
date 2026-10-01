@@ -1,36 +1,39 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { BranchPage } from '#/components/branch-page'
-import { PullRequestPage } from '#/components/pull-request-page'
-import { RepoBranchesPage } from '#/components/repo-branches-page'
-import { RunPage } from '#/components/run-page'
+import { NotFound } from '#/components/not-found'
+import { TraceTargetPage } from '#/components/trace-target-page'
 import { UploadTracesSheet } from '#/components/upload-traces-sheet'
+import { branchQueryOptions } from '#/hooks/use-branches'
 import { useCurrentRepo } from '#/hooks/use-current-repo'
-import { traceTargetSearchSchema } from '#/lib/schemas/trace-target'
-import type { Doc } from '../../../convex/_generated/dataModel'
-import type { TraceTargetSearch } from '#/lib/schemas/trace-target'
+import { pullRequestQueryOptions } from '#/hooks/use-pull-requests'
+import { repoQueryOptions } from '#/hooks/use-repos'
+import { runQueryOptions } from '#/hooks/use-runs'
+import { ensureEntity, ensureQuery } from '#/lib/ensure-entity'
+import {
+  targetBranch,
+  traceTargetSearchSchema,
+} from '#/lib/schemas/trace-target'
 
 export const Route = createFileRoute('/_app/repos/$repoId/traces/create')({
   validateSearch: traceTargetSearchSchema,
+  loaderDeps: ({ search: { branch, pull, job } }) => ({ branch, pull, job }),
+  loader: async ({ context: { queryClient }, params: { repoId }, deps }) => {
+    if (deps.job) {
+      await ensureEntity(queryClient, runQueryOptions(repoId, deps.job))
+    } else if (deps.pull) {
+      await ensureEntity(
+        queryClient,
+        pullRequestQueryOptions(repoId, deps.pull),
+      )
+    } else {
+      const repo = await ensureEntity(queryClient, repoQueryOptions(repoId))
+      const name = targetBranch(deps, repo)
+      // A branch that is not stored yet is a valid upload target, so it may resolve to null.
+      if (name) await ensureQuery(queryClient, branchQueryOptions(repoId, name))
+    }
+  },
+  notFoundComponent: () => <NotFound entity="Upload target" />,
   component: CreateTraces,
 })
-
-/** The page the upload is for, so it stays visible behind the sheet. */
-function TargetPage({
-  repo,
-  search: { branch, pull, job },
-}: {
-  repo: Doc<'repos'>
-  search: TraceTargetSearch
-}) {
-  if (job) return <RunPage repo={repo} runId={job} />
-  if (pull) return <PullRequestPage repo={repo} number={pull} />
-  const name = branch ?? repo.defaultBranch
-  return name ? (
-    <BranchPage repo={repo} name={name} />
-  ) : (
-    <RepoBranchesPage repo={repo} />
-  )
-}
 
 function CreateTraces() {
   const { repoId } = Route.useParams()
@@ -39,7 +42,7 @@ function CreateTraces() {
   const repo = useCurrentRepo()
 
   const close = () => {
-    const { branch, pull, job } = search
+    const { pull, job } = search
     if (job)
       return navigate({
         to: '/repos/$repoId/runs/$runId',
@@ -50,7 +53,7 @@ function CreateTraces() {
         to: '/repos/$repoId/pulls/$number',
         params: { repoId, number: pull },
       })
-    const name = branch ?? repo.defaultBranch
+    const name = targetBranch(search, repo)
     return name
       ? navigate({
           to: '/repos/$repoId/branches/$',
@@ -61,7 +64,7 @@ function CreateTraces() {
 
   return (
     <>
-      <TargetPage repo={repo} search={search} />
+      <TraceTargetPage repo={repo} search={search} />
       <UploadTracesSheet
         repo={repo}
         search={search}

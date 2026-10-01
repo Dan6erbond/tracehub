@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { convexQuery, useConvexAction } from '@convex-dev/react-query'
 import { usePaginatedQuery } from 'convex/react'
+import { useSuspenseEntity } from '#/hooks/use-suspense-entity'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import type { RunScope } from '#/lib/schemas/run'
@@ -15,13 +16,17 @@ export const usePipelines = (repoId: Id<'repos'>, scope?: RunScope) =>
     { initialNumItems: PIPELINES_PAGE_SIZE },
   )
 
+export const pipelineQueryOptions = (
+  repoId: Id<'repos'>,
+  pipelineId: Id<'ciPipelines'>,
+) => convexQuery(api.ciPipelines.getPipeline, { repoId, pipelineId })
+
+/** Expects a loader to have ensured the pipeline query. */
 export const usePipeline = (
   repoId: Id<'repos'>,
   pipelineId: Id<'ciPipelines'>,
 ) => {
-  const pipeline = useQuery(
-    convexQuery(api.ciPipelines.getPipeline, { repoId, pipelineId }),
-  )
+  const pipeline = useSuspenseEntity(pipelineQueryOptions(repoId, pipelineId))
   const loadJobs = useConvexAction(api.ciPipelines.loadJobs)
   const loadedFor = useRef<Id<'ciPipelines'> | null>(null)
   const {
@@ -31,13 +36,10 @@ export const usePipeline = (
   } = useMutation({ mutationFn: () => loadJobs({ repoId, pipelineId }) })
   // Pipelines older than the branch heads have no jobs until the host is asked once.
   useEffect(() => {
-    if (pipeline.data?.jobs.length === 0 && loadedFor.current !== pipelineId) {
+    if (pipeline.jobs.length === 0 && loadedFor.current !== pipelineId) {
       loadedFor.current = pipelineId
       loadJobsOnce()
     }
-  }, [pipeline.data?.jobs.length, pipelineId, loadJobsOnce])
+  }, [pipeline.jobs.length, pipelineId, loadJobsOnce])
   return { pipeline, loadingJobs, loadJobsError }
 }
-
-export const useJob = (repoId: Id<'repos'>, jobId: Id<'ciJobs'>) =>
-  useQuery(convexQuery(api.ciJobs.getJob, { repoId, jobId }))

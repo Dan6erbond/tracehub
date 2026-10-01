@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { convexQuery, useConvexAction } from '@convex-dev/react-query'
 import { usePaginatedQuery } from 'convex/react'
+import { useSuspenseEntity } from '#/hooks/use-suspense-entity'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 
@@ -17,13 +18,20 @@ export const useBranches = (
     { initialNumItems: BRANCHES_PAGE_SIZE },
   )
 
-export const useBranch = (repoId: Id<'repos'>, name?: string) =>
+export const branchQueryOptions = (repoId: Id<'repos'>, name: string) =>
+  convexQuery(api.branches.getBranch, { repoId, name })
+
+/** For a branch that may not exist (yet) or may be skipped; `useBranch` is the one to use under a loader. */
+export const useOptionalBranch = (repoId: Id<'repos'>, name?: string) =>
   useQuery(
-    convexQuery(
-      api.branches.getBranch,
-      name === undefined ? 'skip' : { repoId, name },
-    ),
+    name === undefined
+      ? convexQuery(api.branches.getBranch, 'skip')
+      : branchQueryOptions(repoId, name),
   )
+
+/** Expects a loader to have ensured the query. */
+export const useBranch = (repoId: Id<'repos'>, name: string) =>
+  useSuspenseEntity(branchQueryOptions(repoId, name))
 
 /** Lists branches with the repo's default branch always pinned first, even when the open-pull-request filter would hide it. */
 export function useBranchesDefaultFirst(
@@ -31,7 +39,10 @@ export function useBranchesDefaultFirst(
   openPullRequestsOnly: boolean,
 ) {
   const { results, ...rest } = useBranches(repo._id, openPullRequestsOnly)
-  const { data: defaultBranch } = useBranch(repo._id, repo.defaultBranch)
+  const { data: defaultBranch } = useOptionalBranch(
+    repo._id,
+    repo.defaultBranch,
+  )
   const pinned = defaultBranch ? [defaultBranch] : []
   return {
     ...rest,

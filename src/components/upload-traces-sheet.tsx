@@ -41,17 +41,18 @@ export function UploadTracesSheet({
         <SheetHeader>
           <SheetTitle>Upload traces</SheetTitle>
           <SheetDescription>
-            {target ? describeTarget(target) : 'Target not found'}
+            {target && describeTarget(target)}
           </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-4">
-          {target === undefined && <Skeleton className="h-40 w-full" />}
-          {target && (
+          {target ? (
             <CreateRunForm
               repoId={repo._id}
               target={target}
               onCreated={onCreated}
             />
+          ) : (
+            <Skeleton className="h-40 w-full" />
           )}
         </div>
       </SheetContent>

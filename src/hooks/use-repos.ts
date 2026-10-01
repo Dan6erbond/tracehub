@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { convexQuery, useConvexAction } from '@convex-dev/react-query'
 import { usePaginatedQuery } from 'convex/react'
+import { useSuspenseEntity } from '#/hooks/use-suspense-entity'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
@@ -14,8 +15,12 @@ export const useRepos = (search?: string) =>
     { initialNumItems: REPOS_PAGE_SIZE },
   )
 
+export const repoQueryOptions = (repoId: Id<'repos'>) =>
+  convexQuery(api.repos.getRepo, { repoId })
+
+/** Expects a loader to have ensured the query. */
 export const useRepo = (repoId: Id<'repos'>) =>
-  useQuery(convexQuery(api.repos.getRepo, { repoId }))
+  useSuspenseEntity(repoQueryOptions(repoId))
 
 export function useReloadRepos() {
   const reloadRepos = useConvexAction(api.repos.reloadRepos)
