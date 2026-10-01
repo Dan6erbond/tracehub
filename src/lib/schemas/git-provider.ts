@@ -27,7 +27,9 @@ export const providerSlugSchema = z
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
+// Zod 4 runs refinements even when the URL check before them failed.
 const isProviderUrl = (value: string) => {
+  if (!URL.canParse(value)) return false
   const url = new URL(value)
   return (
     !url.username &&
