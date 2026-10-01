@@ -3,7 +3,9 @@ import { authClient } from '#/lib/auth-client'
 
 export type Theme = 'light' | 'dark' | 'system'
 
-const STORAGE_KEY = 'theme'
+const STORAGE_KEY = 'tracehub-theme'
+// The embedded Playwright trace viewer shares our origin and reads its own setting from this key, valued `dark-mode`, `light-mode` or `system`.
+const TRACE_VIEWER_STORAGE_KEY = 'theme'
 const DEFAULT_THEME: Theme = 'dark'
 
 /** What the server renders on <html>; the init script corrects it before hydration when a stored preference differs. */
@@ -18,6 +20,15 @@ function applyTheme(theme: Theme) {
     theme === 'dark' ||
     (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.classList.toggle('dark', dark)
+}
+
+/** Stores the theme for the next page load and hands it to the trace viewer, which reads it when it loads. */
+function storeTheme(theme: Theme) {
+  localStorage.setItem(STORAGE_KEY, theme)
+  localStorage.setItem(
+    TRACE_VIEWER_STORAGE_KEY,
+    theme === 'system' ? theme : `${theme}-mode`,
+  )
 }
 
 const ThemeContext = createContext<{
@@ -35,18 +46,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
-    setThemeState(isTheme(stored) ? stored : DEFAULT_THEME)
+    const initial = isTheme(stored) ? stored : DEFAULT_THEME
+    storeTheme(initial)
+    setThemeState(initial)
   }, [])
 
   useEffect(() => {
     if (!isTheme(profileTheme)) return
-    localStorage.setItem(STORAGE_KEY, profileTheme)
+    storeTheme(profileTheme)
     setThemeState(profileTheme)
     applyTheme(profileTheme)
   }, [profileTheme])
 
   const setTheme = (next: Theme) => {
-    localStorage.setItem(STORAGE_KEY, next)
+    storeTheme(next)
     setThemeState(next)
     applyTheme(next)
     if (session) void authClient.updateUser({ theme: next })
