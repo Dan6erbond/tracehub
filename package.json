@@ -17,7 +17,8 @@
     "preview": "vite preview",
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
-    "check": "prettier --check ."
+    "check": "prettier --check .",
+    "wipe:dev": "bash scripts/wipe-dev.sh"
   },
   "dependencies": {
     "@convex-dev/aggregate": "^0.3.1",
