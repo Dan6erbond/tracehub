@@ -1,14 +1,11 @@
 import { z } from 'zod'
-import { zid } from 'convex-helpers/server/zod4'
+import { withSystemFields } from 'convex-helpers/server/zod4'
 import { repoSchema } from './repo'
 
 /** A repo as queries return it: the stored fields plus where it lives on its Git host. */
-export const repoViewSchema = repoSchema.extend({
-  _id: zid('repos'),
-  _creationTime: z.number(),
-  url: z.string(),
-  providerName: z.string(),
-})
+export const repoViewSchema = repoSchema.extend(
+  withSystemFields('repos', { url: z.string(), providerName: z.string() }),
+)
 export type RepoView = z.infer<typeof repoViewSchema>
 
 /** Page of the Git host that an entity (branch, pull request) has. */

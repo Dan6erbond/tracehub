@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { zid } from 'convex-helpers/server/zod4'
+import { withSystemFields } from 'convex-helpers/server/zod4'
 import { httpUrlSchema } from './url'
 
 export const gitProviderTypeSchema = z.enum(['github'])
@@ -69,11 +69,7 @@ export type GitProviderPublic = z.infer<typeof gitProviderPublicSchema>
 /** A provider as admins see it: everything but the secret, which is only reported as set. */
 export const gitProviderAdminSchema = gitProviderSchema
   .omit({ clientSecret: true })
-  .extend({
-    _id: zid('gitProviders'),
-    _creationTime: z.number(),
-    hasSecret: z.boolean(),
-  })
+  .extend(withSystemFields('gitProviders', { hasSecret: z.boolean() }))
 export type GitProviderAdmin = z.infer<typeof gitProviderAdminSchema>
 
 const optionalUrlSchema = z.union([z.literal(''), providerUrlSchema])
