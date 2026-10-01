@@ -7,6 +7,7 @@ import { PageTitle } from '#/components/page-title'
 import { CallbackUrl } from '#/components/providers/callback-url'
 import { EditProviderForm } from '#/components/providers/edit-provider-form'
 import { RemoveProviderDialog } from '#/components/providers/remove-provider-dialog'
+import { SetupGuide } from '#/components/providers/setup-guide'
 import { Badge } from '#/components/ui/badge'
 import { Card, CardContent } from '#/components/ui/card'
 import { useCallbackBase, useGitProvider } from '#/hooks/use-git-providers'
@@ -46,6 +47,7 @@ function ProviderPage() {
       <Card>
         <CardContent className="flex flex-col gap-8">
           <CallbackUrl url={`${callbackBase}/${provider.slug}`} />
+          <SetupGuide type={provider.type} baseUrl={provider.baseUrl} />
           <EditProviderForm provider={provider} />
         </CardContent>
       </Card>

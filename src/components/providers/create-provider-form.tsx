@@ -6,6 +6,7 @@ import {
 } from '#/components/form/provider-fields'
 import { useAppForm } from '#/components/form/use-app-form'
 import { CallbackUrl } from '#/components/providers/callback-url'
+import { SetupGuide } from '#/components/providers/setup-guide'
 import { useCreateGitProvider } from '#/hooks/use-git-providers'
 import type { ProviderTemplate } from '#/lib/schemas/git-provider'
 
@@ -43,6 +44,9 @@ export function CreateProviderForm({
           )}
           <form.Subscribe selector={(state) => state.values.slug}>
             {(slug) => <CallbackUrl url={`${callbackBase}/${slug}`} />}
+          </form.Subscribe>
+          <form.Subscribe selector={(state) => state.values.baseUrl}>
+            {(baseUrl) => <SetupGuide type={template.type} baseUrl={baseUrl} />}
           </form.Subscribe>
           <ProviderFields
             form={form}
