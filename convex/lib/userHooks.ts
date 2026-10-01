@@ -12,6 +12,7 @@ type UserHooks = NonNullable<
 >
 type UserCreateBefore = NonNullable<NonNullable<UserHooks['create']>['before']>
 type UserDeleteAfter = NonNullable<NonNullable<UserHooks['delete']>['after']>
+type UserUpdateBefore = NonNullable<NonNullable<UserHooks['update']>['before']>
 type AccountHooks = NonNullable<
   NonNullable<BetterAuthOptions['databaseHooks']>['account']
 >
@@ -36,16 +37,17 @@ const assertRegistrationEnabled = async (ctx: GenericCtx<DataModel>) => {
     throw new APIError('FORBIDDEN', { message: 'Registration is disabled' })
 }
 
-const providerAllowsSignUp = async (
+const findProvider = (
   ctx: GenericCtx<DataModel>,
   slug: string,
-) => {
-  const provider: Doc<'gitProviders'> | null = await ctx.runQuery(
-    internal.gitProviders.findBySlug,
-    { slug },
-  )
-  return provider?.enabled === true && provider.allowSignUp
-}
+): Promise<Doc<'gitProviders'> | null> =>
+  ctx.runQuery(internal.gitProviders.findBySlug, { slug })
+
+/** The slug of the provider an OAuth callback request is for. */
+const callbackSlugOf = (context: {
+  path?: string
+  params?: { id?: string }
+}) => (context.path === OAUTH_CALLBACK_PATH ? context.params?.id : undefined)
 
 /**
  * The gates on creating users and accounts. They share the set of requests that create a user, so call this once per auth instance (requests do not share one).
@@ -59,6 +61,8 @@ export const createSignUpGates = (ctx: GenericCtx<DataModel>) => {
    * A provider with `allowSignUp` bypasses the toggle; this runs here rather than through the provider's `disableImplicitSignUp`,
    * which the client lifts with `requestSignUp` and which could not express the toggle anyway.
    * Through an OAuth callback only an address the Git host reports as verified may register, so nobody can squat on an address they do not own.
+   * A host's "verified" may only mean the account is activated, since Gitea and Forgejo do not confirm addresses by default,
+   * so only a provider `trustedForLinking` creates a verified user; anyone else gets an unverified one, which no other provider can then link into by email.
    *
    * Hooks run in the app's Convex context (the HTTP action serving `/api/auth/*`, or the action or mutation that called `getAuth`), so app tables are readable through `ctx.runQuery`.
    * The component only executes the adapter's storage functions and never runs hooks, so there is no component context to degrade for.
@@ -68,17 +72,40 @@ export const createSignUpGates = (ctx: GenericCtx<DataModel>) => {
       throw new APIError('INTERNAL_SERVER_ERROR', {
         message: 'Users can only be created through an auth endpoint',
       })
-    const callbackSlug =
-      context.path === OAUTH_CALLBACK_PATH ? context.params?.id : undefined
+    const callbackSlug = callbackSlugOf(context)
     if (callbackSlug !== undefined && !user.emailVerified)
       throw new APIError('FORBIDDEN', { message: 'Email not verified' })
     requestsCreatingUser.add(context)
-    if (await noUsersYet(context.context.adapter))
-      return { data: { role: adminRole } }
+    const provider =
+      callbackSlug === undefined ? null : await findProvider(ctx, callbackSlug)
+    const firstUser = await noUsersYet(context.context.adapter)
+    const data = {
+      ...(callbackSlug !== undefined && !provider?.trustedForLinking
+        ? { emailVerified: false }
+        : {}),
+      ...(firstUser ? { role: adminRole } : {}),
+    }
+    const created = Object.keys(data).length > 0 ? { data } : undefined
+    if (firstUser) return created
     // The endpoint checks the caller's role itself.
     if (context.path === ADMIN_CREATE_USER_PATH) return
-    if (callbackSlug && (await providerAllowsSignUp(ctx, callbackSlug))) return
+    if (provider?.enabled === true && provider.allowSignUp) return created
     await assertRegistrationEnabled(ctx)
+    return created
+  }
+
+  /**
+   * `databaseHooks.user.update.before`: Better Auth marks a user verified whenever a sign-in through one of their linked accounts reports the same address as verified.
+   * That would undo `gateUserCreation` on the next sign-in, so on an OAuth callback only a provider `trustedForLinking` may set `emailVerified`.
+   */
+  const gateEmailVerification: UserUpdateBefore = async (
+    { emailVerified },
+    context,
+  ) => {
+    const callbackSlug = context ? callbackSlugOf(context) : undefined
+    if (!emailVerified || callbackSlug === undefined) return
+    if (!(await findProvider(ctx, callbackSlug))?.trustedForLinking)
+      return { data: { emailVerified: false } }
   }
 
   /**
@@ -93,10 +120,7 @@ export const createSignUpGates = (ctx: GenericCtx<DataModel>) => {
    */
   const gateAccountLinking: AccountCreateBefore = async (account, context) => {
     if (context?.path !== OAUTH_CALLBACK_PATH) return
-    const provider: Doc<'gitProviders'> | null = await ctx.runQuery(
-      internal.gitProviders.findBySlug,
-      { slug: account.providerId },
-    )
+    const provider = await findProvider(ctx, account.providerId)
     if (!provider?.enabled)
       throw new APIError('FORBIDDEN', {
         message: 'This provider is no longer available',
@@ -110,7 +134,7 @@ export const createSignUpGates = (ctx: GenericCtx<DataModel>) => {
       })
   }
 
-  return { gateUserCreation, gateAccountLinking }
+  return { gateUserCreation, gateEmailVerification, gateAccountLinking }
 }
 
 /**

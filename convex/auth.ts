@@ -25,7 +25,8 @@ export const authComponent = createClient<DataModel, typeof authSchema>(
 )
 
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
-  const { gateUserCreation, gateAccountLinking } = createSignUpGates(ctx)
+  const { gateUserCreation, gateEmailVerification, gateAccountLinking } =
+    createSignUpGates(ctx)
   const loadProviders = createProviderLoader(ctx)
   return {
     baseURL: env.SITE_URL,
@@ -56,6 +57,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
     databaseHooks: {
       user: {
         create: { before: gateUserCreation },
+        update: { before: gateEmailVerification },
         delete: { after: cleanUpDeletedUser(ctx) },
       },
       account: { create: { before: gateAccountLinking } },
