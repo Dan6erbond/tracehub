@@ -1,3 +1,4 @@
+import { asyncMap } from 'convex-helpers'
 import { zid } from 'convex-helpers/server/zod4'
 import { zInternalQuery } from './lib/functions'
 import {
@@ -43,29 +44,29 @@ export const countScopeTraces = zInternalQuery({
   args: { repoId: zid('repos'), scope: resolvedRunScopeSchema },
   handler: (ctx, { repoId, scope: { branch, prNumbers } }) =>
     toCounts(async (status) => {
-      const onBranch =
+      const [onBranch, onPullsOnly] = await Promise.all([
         branch === undefined
           ? 0
-          : await tracesByBranch.count(ctx, {
+          : tracesByBranch.count(ctx, {
               namespace: repoId,
               bounds: { prefix: [branch, status] },
-            })
-      const onPullsOnly = await Promise.all(
-        prNumbers.map(async (prNumber) => {
-          const onPull = await tracesByPull.count(ctx, {
-            namespace: repoId,
-            bounds: { prefix: [prNumber, status] },
-          })
-          const alsoOnBranch =
+            }),
+        asyncMap(prNumbers, async (prNumber) => {
+          const [onPull, alsoOnBranch] = await Promise.all([
+            tracesByPull.count(ctx, {
+              namespace: repoId,
+              bounds: { prefix: [prNumber, status] },
+            }),
             branch === undefined
               ? 0
-              : await tracesByPull.count(ctx, {
+              : tracesByPull.count(ctx, {
                   namespace: repoId,
                   bounds: { prefix: [prNumber, status, branch] },
-                })
+                }),
+          ])
           return onPull - alsoOnBranch
         }),
-      )
+      ])
       return onPullsOnly.reduce((sum, count) => sum + count, onBranch)
     }),
 })

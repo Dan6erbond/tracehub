@@ -1,5 +1,9 @@
 import { ConvexError, v } from 'convex/values'
-import { NoOp, customCtx } from 'convex-helpers/server/customFunctions'
+import {
+  NoOp,
+  customCtx,
+  customMutation,
+} from 'convex-helpers/server/customFunctions'
 import {
   zCustomAction,
   zCustomMutation,
@@ -17,14 +21,15 @@ import { triggers } from './triggers'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { ActionCtx, MutationCtx, QueryCtx } from '../_generated/server'
 
-const withTriggers = (ctx: MutationCtx) => ({ db: triggers.wrapDB(ctx).db })
+const withTriggers = customCtx((ctx: MutationCtx) => ({
+  db: triggers.wrapDB(ctx).db,
+}))
+const mutationWithTriggers = customMutation(mutation, withTriggers)
 
-export const zQuery = zCustomQuery(query, NoOp)
-export const zMutation = zCustomMutation(mutation, customCtx(withTriggers))
 export const zInternalQuery = zCustomQuery(internalQuery, NoOp)
 export const zInternalMutation = zCustomMutation(
-  internalMutation,
-  customCtx(withTriggers),
+  customMutation(internalMutation, withTriggers),
+  NoOp,
 )
 
 const requireUserId = async (ctx: QueryCtx | ActionCtx) => {
@@ -34,13 +39,6 @@ const requireUserId = async (ctx: QueryCtx | ActionCtx) => {
 }
 
 export const authedQuery = zCustomQuery(query, customCtx(requireUserId))
-export const authedMutation = zCustomMutation(
-  mutation,
-  customCtx(async (ctx) => ({
-    ...withTriggers(ctx),
-    ...(await requireUserId(ctx)),
-  })),
-)
 export const authedAction = zCustomAction(action, customCtx(requireUserId))
 
 /** Adds `userId` and the repo (`ctx.repo`) the user can access, else throws; access is whatever `getUserRepo` decides. */
@@ -69,11 +67,8 @@ const repoCustomization = {
 }
 
 export const repoQuery = zCustomQuery(query, repoCustomization)
-export const repoMutation = zCustomMutation(mutation, {
-  ...repoCustomization,
-  input: async (ctx, args) => {
-    const repo = await repoCustomization.input(ctx, args)
-    return { ...repo, ctx: { ...withTriggers(ctx), ...repo.ctx } }
-  },
-})
+export const repoMutation = zCustomMutation(
+  mutationWithTriggers,
+  repoCustomization,
+)
 export const repoAction = zCustomAction(action, repoCustomization)

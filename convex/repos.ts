@@ -16,13 +16,17 @@ import { getProviderAccessToken } from './lib/gitProviders/getAccessToken'
 import { gitProviders } from './lib/gitProviders'
 import { loadRepositories } from './lib/gitProviders/loadRepositories'
 import { repoActivityAt } from './lib/repoActivity'
-import { replaceOrInsert } from './lib/upsert'
+import { replaceOrInsert, uniqueBy } from './lib/upsert'
 import { paginationOptsSchema } from '../src/lib/schemas/pagination'
 import { gitProviderSchema, repoSchema } from '../src/lib/schemas/repo'
 import type { PullRequest } from '../src/lib/schemas/pull-request'
-import type { Doc, Id } from './_generated/dataModel'
+import type { Doc } from './_generated/dataModel'
 
 const PRUNE_JOBS_SHA_BATCH_SIZE = 25
+
+// Each repo of a batch is upserted and linked in one mutation, so the batch size bounds its reads and writes.
+const SYNC_REPOS_BATCH_SIZE = 50
+const PRUNE_LINKS_BATCH_SIZE = 200
 
 export const listRepos = authedQuery({
   args: { search: z.string().optional(), paginationOpts: paginationOptsSchema },
@@ -61,59 +65,85 @@ export const findByExternalId = zInternalQuery({
       .unique(),
 })
 
-export const upsertRepo = zInternalMutation({
-  args: { repo: repoSchema },
-  handler: async (ctx, { repo }): Promise<Id<'repos'>> => {
-    const existing: Doc<'repos'> | null = await ctx.runQuery(
-      internal.repos.findByExternalId,
-      { provider: repo.provider, externalId: repo.externalId },
-    )
-    return replaceOrInsert(ctx, 'repos', existing, repo)
-  },
+export const findUserRepoLink = zInternalQuery({
+  args: { userId: z.string(), repoId: zid('repos') },
+  handler: (ctx, { userId, repoId }) =>
+    ctx.db
+      .query('userRepos')
+      .withIndex('by_user_repo', (q) =>
+        q.eq('userId', userId).eq('repoId', repoId),
+      )
+      .unique(),
 })
 
 export const syncUserRepos = zInternalMutation({
   args: {
     userId: z.string(),
-    providers: z.array(gitProviderSchema),
     repos: z.array(repoSchema),
+    syncedAt: z.number(),
   },
-  handler: async (ctx, { userId, providers, repos }) => {
-    const accessible = new Set<string>()
-    for (const repo of repos) {
-      const repoId = await ctx.runMutation(internal.repos.upsertRepo, { repo })
-      accessible.add(repoId)
-      const stored = await ctx.db.get('repos', repoId)
-      const activityAt = stored ? repoActivityAt(stored) : undefined
-      const link = await ctx.db
-        .query('userRepos')
-        .withIndex('by_user_repo', (q) =>
-          q.eq('userId', userId).eq('repoId', repoId),
+  handler: async (ctx, { userId, repos, syncedAt }) => {
+    await asyncMap(
+      uniqueBy(
+        repos,
+        ({ provider, externalId }) => `${provider}\0${externalId}`,
+      ),
+      async (repo) => {
+        const existing: Doc<'repos'> | null = await ctx.runQuery(
+          internal.repos.findByExternalId,
+          { provider: repo.provider, externalId: repo.externalId },
         )
-        .unique()
-      if (!link)
-        await ctx.db.insert('userRepos', {
-          userId,
-          repoId,
-          fullName: repo.fullName,
-          activityAt,
-        })
-      else if (link.activityAt !== activityAt)
-        await ctx.db.patch('userRepos', link._id, { activityAt })
-    }
+        const stored = await replaceOrInsert(ctx, 'repos', existing, repo)
+        const link: Doc<'userRepos'> | null = await ctx.runQuery(
+          internal.repos.findUserRepoLink,
+          { userId, repoId: stored._id },
+        )
+        // An existing link already follows the repo's name and activity through the repos trigger.
+        // Overlapping reloads must not move `syncedAt` back, or the later one's prune would drop live links.
+        if (link)
+          await ctx.db.patch('userRepos', link._id, {
+            syncedAt: Math.max(link.syncedAt, syncedAt),
+          })
+        else
+          await ctx.db.insert('userRepos', {
+            userId,
+            repoId: stored._id,
+            fullName: stored.fullName,
+            activityAt: repoActivityAt(stored),
+            syncedAt,
+          })
+      },
+    )
+  },
+})
 
-    // Access revoked on the host: drop links, but only for providers that loaded successfully.
-    const links = await ctx.db
+/**
+ * Access revoked on the host: drops the links a reload did not list (not touched since `before`),
+ * but only for providers that loaded successfully. Returns the cursor to continue with, or null when done.
+ */
+export const pruneUserRepos = zInternalMutation({
+  args: {
+    userId: z.string(),
+    providers: z.array(gitProviderSchema),
+    before: z.number(),
+    cursor: z.string().nullable(),
+  },
+  handler: async (
+    ctx,
+    { userId, providers, before, cursor },
+  ): Promise<string | null> => {
+    const { page, isDone, continueCursor } = await ctx.db
       .query('userRepos')
-      .withIndex('by_user_activityAt', (q) => q.eq('userId', userId))
-      .collect()
-    await asyncMap(links, async (link) => {
+      .withIndex('by_user_syncedAt', (q) =>
+        q.eq('userId', userId).lt('syncedAt', before),
+      )
+      .paginate({ numItems: PRUNE_LINKS_BATCH_SIZE, cursor })
+    await asyncMap(page, async (link) => {
       const repo = await ctx.db.get('repos', link.repoId)
-      const stale =
-        !repo ||
-        (providers.includes(repo.provider) && !accessible.has(repo._id))
-      if (stale) await ctx.db.delete('userRepos', link._id)
+      if (!repo || providers.includes(repo.provider))
+        await ctx.db.delete('userRepos', link._id)
     })
+    return isDone ? null : continueCursor
   },
 })
 
@@ -121,11 +151,22 @@ export const reloadRepos = authedAction({
   args: {},
   handler: async (ctx) => {
     const { providers, repos } = await loadRepositories(ctx)
-    await ctx.runMutation(internal.repos.syncUserRepos, {
-      userId: ctx.userId,
-      providers,
-      repos,
-    })
+    const startedAt = Date.now()
+    for (const batch of chunk(repos, SYNC_REPOS_BATCH_SIZE))
+      await ctx.runMutation(internal.repos.syncUserRepos, {
+        userId: ctx.userId,
+        repos: batch,
+        syncedAt: startedAt,
+      })
+    let cursor: string | null = null
+    do
+      cursor = await ctx.runMutation(internal.repos.pruneUserRepos, {
+        userId: ctx.userId,
+        providers,
+        before: startedAt,
+        cursor,
+      })
+    while (cursor !== null)
   },
 })
 
@@ -194,13 +235,11 @@ export const reloadRepo = repoAction({
 
 export const getUserRepo = zInternalQuery({
   args: { userId: z.string(), repoId: zid('repos') },
-  handler: async (ctx, { userId, repoId }) => {
-    const link = await ctx.db
-      .query('userRepos')
-      .withIndex('by_user_repo', (q) =>
-        q.eq('userId', userId).eq('repoId', repoId),
-      )
-      .unique()
+  handler: async (ctx, { userId, repoId }): Promise<Doc<'repos'> | null> => {
+    const link: Doc<'userRepos'> | null = await ctx.runQuery(
+      internal.repos.findUserRepoLink,
+      { userId, repoId },
+    )
     return link ? ctx.db.get('repos', repoId) : null
   },
 })

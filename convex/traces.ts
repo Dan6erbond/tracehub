@@ -1,13 +1,10 @@
 import { ConvexError } from 'convex/values'
 import { z } from 'zod'
+import { asyncMap } from 'convex-helpers'
 import { zid } from 'convex-helpers/server/zod4'
 import { internal } from './_generated/api'
-import {
-  repoMutation,
-  repoQuery,
-  zInternalMutation,
-  zInternalQuery,
-} from './lib/functions'
+import { findInRepoQuery } from './lib/findInRepo'
+import { repoMutation, repoQuery, zInternalMutation } from './lib/functions'
 import {
   addTracesInputSchema,
   createRunInputSchema,
@@ -34,25 +31,31 @@ export const insertTraces = zInternalMutation({
     const run = await ctx.db.get('runs', runId)
     if (!run) throw new ConvexError('Run not found')
     const { repoId, branch, prNumber } = run
-    for (const trace of traces) {
-      // The client only names the file, so its size comes from storage and a file can back one trace.
-      const file = await ctx.db.system.get('_storage', trace.storageId)
+    // Checked together up front, since a file can back one trace and the checks below run in parallel.
+    if (new Set(traces.map(({ storageId }) => storageId)).size < traces.length)
+      throw new ConvexError('A file can back only one trace')
+    const files = await asyncMap(traces, async ({ storageId }) => {
+      // The client only names the file, so its size comes from storage.
+      const file = await ctx.db.system.get('_storage', storageId)
       if (!file) throw new ConvexError('Uploaded file not found')
       const attached = await ctx.db
         .query('traces')
-        .withIndex('by_storageId', (q) => q.eq('storageId', trace.storageId))
+        .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
         .first()
       if (attached)
         throw new ConvexError('Uploaded file already belongs to a trace')
+      return file
+    })
+    // Inserted in order: each trace rewrites the shared aggregates through triggers.
+    for (const [index, trace] of traces.entries())
       await ctx.db.insert('traces', {
         repoId,
         runId,
         branch,
         prNumber,
         ...trace,
-        size: file.size,
+        size: files[index].size,
       })
-    }
   },
 })
 
@@ -100,7 +103,7 @@ export const addTracesToRun = repoMutation({
   handler: async (ctx, { repoId, runId, traces }): Promise<void> => {
     const run: Doc<'runs'> | null = await ctx.runQuery(
       internal.runs.findInRepo,
-      { repoId, runId },
+      { repoId, id: runId },
     )
     if (!run) throw new ConvexError('Run not found')
     await ctx.runMutation(internal.traces.insertTraces, { runId, traces })
@@ -115,7 +118,7 @@ export const listTraces = repoQuery({
   ): Promise<PaginationResult<Doc<'traces'>>> => {
     const run: Doc<'runs'> | null = await ctx.runQuery(
       internal.runs.findInRepo,
-      { repoId, runId },
+      { repoId, id: runId },
     )
     if (!run) return { page: [], isDone: true, continueCursor: '' }
     return ctx.db
@@ -125,18 +128,12 @@ export const listTraces = repoQuery({
   },
 })
 
-export const findInRepo = zInternalQuery({
-  args: { repoId: zid('repos'), traceId: zid('traces') },
-  handler: async (ctx, { repoId, traceId }) => {
-    const trace = await ctx.db.get('traces', traceId)
-    return trace?.repoId === repoId ? trace : null
-  },
-})
+export const findInRepo = findInRepoQuery('traces')
 
 export const getTrace = repoQuery({
   args: { traceId: zid('traces') },
   handler: (ctx, { repoId, traceId }): Promise<Doc<'traces'> | null> =>
-    ctx.runQuery(internal.traces.findInRepo, { repoId, traceId }),
+    ctx.runQuery(internal.traces.findInRepo, { repoId, id: traceId }),
 })
 
 export const getTraceFileUrl = repoQuery({
@@ -144,7 +141,7 @@ export const getTraceFileUrl = repoQuery({
   handler: async (ctx, { repoId, traceId }): Promise<string | null> => {
     const trace: Doc<'traces'> | null = await ctx.runQuery(
       internal.traces.findInRepo,
-      { repoId, traceId },
+      { repoId, id: traceId },
     )
     return trace && ctx.storage.getUrl(trace.storageId)
   },
