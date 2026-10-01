@@ -4,6 +4,7 @@ import { zodToConvexFields } from 'convex-helpers/server/zod4'
 import { branchSchema } from '../src/lib/schemas/branch'
 import { storedCiJobSchema } from '../src/lib/schemas/ci-job'
 import { ciPipelineSchema } from '../src/lib/schemas/ci-pipeline'
+import { instanceSettingsSchema } from '../src/lib/schemas/instance-settings'
 import { pullRequestSchema } from '../src/lib/schemas/pull-request'
 import { reloadLockSchema } from '../src/lib/schemas/reload-lock'
 import { repoSchema } from '../src/lib/schemas/repo'
@@ -11,6 +12,10 @@ import { runSchema } from '../src/lib/schemas/run'
 import { traceSchema } from '../src/lib/schemas/trace'
 
 export default defineSchema({
+  // Singleton: at most one row, absent until an admin first saves the settings.
+  instanceSettings: defineTable(
+    zodToConvexFields(instanceSettingsSchema.shape),
+  ),
   // Separate from repos and userRepos so lock writes never invalidate their queries.
   reloadLocks: defineTable(zodToConvexFields(reloadLockSchema.shape)).index(
     'by_key',

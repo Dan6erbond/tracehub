@@ -9,7 +9,8 @@ import {
   zCustomMutation,
   zCustomQuery,
 } from 'convex-helpers/server/zod4'
-import { internal } from '../_generated/api'
+import { components, internal } from '../_generated/api'
+import { authComponent } from '../auth'
 import {
   action,
   internalMutation,
@@ -19,6 +20,7 @@ import {
 } from '../_generated/server'
 import { triggers } from './triggers'
 import { errorCodes } from '../../src/lib/errors'
+import { isAdminRole } from '../../src/lib/roles'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { ActionCtx, MutationCtx, QueryCtx } from '../_generated/server'
 
@@ -27,24 +29,62 @@ const withTriggers = customCtx((ctx: MutationCtx) => ({
 }))
 const mutationWithTriggers = customMutation(mutation, withTriggers)
 
+export const zQuery = zCustomQuery(query, NoOp)
 export const zInternalQuery = zCustomQuery(internalQuery, NoOp)
 export const zInternalMutation = zCustomMutation(
   customMutation(internalMutation, withTriggers),
   NoOp,
 )
 
+const unauthenticated = () =>
+  new ConvexError({
+    code: errorCodes.unauthenticated,
+    message: 'Unauthenticated',
+  })
+
+/**
+ * The token alone stays valid until it expires (15 minutes), so a ban or removal would linger; the session it was issued for must still exist.
+ * One read by document id, and a revoked session invalidates live queries.
+ */
 const requireUserId = async (ctx: QueryCtx | ActionCtx) => {
   const identity = await ctx.auth.getUserIdentity()
-  if (!identity)
-    throw new ConvexError({
-      code: errorCodes.unauthenticated,
-      message: 'Unauthenticated',
-    })
+  if (!identity) throw unauthenticated()
+  const session = await ctx.runQuery(components.betterAuth.adapter.findOne, {
+    model: 'session',
+    where: [
+      { field: '_id', value: identity.sessionId as string },
+      { field: 'expiresAt', operator: 'gt', value: Date.now() },
+    ],
+  })
+  if (!session) throw unauthenticated()
   return { userId: identity.subject }
 }
 
 export const authedQuery = zCustomQuery(query, customCtx(requireUserId))
 export const authedAction = zCustomAction(action, customCtx(requireUserId))
+
+export const viewerIsAdmin = async (
+  ctx: QueryCtx | MutationCtx | ActionCtx,
+): Promise<boolean> =>
+  isAdminRole((await authComponent.safeGetAuthUser(ctx))?.role)
+
+/** Adds `userId` like the authed builders, but only for admins; the role is read from Better Auth on every call, not from the token. */
+const requireAdmin = async (ctx: QueryCtx | MutationCtx | ActionCtx) => {
+  const { userId } = await requireUserId(ctx)
+  if (!(await viewerIsAdmin(ctx)))
+    throw new ConvexError({
+      code: errorCodes.forbidden,
+      message: 'Admin access required',
+    })
+  return { userId }
+}
+
+export const adminQuery = zCustomQuery(query, customCtx(requireAdmin))
+export const adminMutation = zCustomMutation(
+  mutationWithTriggers,
+  customCtx(requireAdmin),
+)
+export const adminAction = zCustomAction(action, customCtx(requireAdmin))
 
 /** Adds `userId` and the repo (`ctx.repo`) the user can access, else throws; access is whatever `getUserRepo` decides. */
 const requireRepoAccess = async (

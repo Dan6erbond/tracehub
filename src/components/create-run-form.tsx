@@ -28,86 +28,82 @@ export function CreateRunForm({
   })
 
   return (
-    <form
-      className="flex flex-col gap-6"
-      onSubmit={(event) => {
-        event.preventDefault()
-        void form.handleSubmit()
-      }}
-    >
-      <FieldGroup>
-        {target.kind !== 'run' && (
-          <>
-            <form.AppField name="sha">
-              {(field) => (
-                <field.TextField
-                  label="Commit SHA"
-                  description="The commit the traces were recorded against"
-                />
-              )}
-            </form.AppField>
-            <form.AppField name="title">
-              {(field) => (
-                <field.TextField
-                  label="Title"
-                  placeholder="Optional"
-                  description="Names the run, e.g. for pinned feature traces"
-                />
-              )}
-            </form.AppField>
-            <form.AppField name="description">
-              {(field) => (
-                <field.TextareaField
-                  label="Description"
-                  placeholder="Optional"
-                />
-              )}
-            </form.AppField>
-            {target.kind === 'pull' && (
-              <form.AppField name="pinned">
+    <form.AppForm>
+      <form.FormElement className="flex flex-col gap-6">
+        <FieldGroup>
+          {target.kind !== 'run' && (
+            <>
+              <form.AppField name="sha">
                 {(field) => (
-                  <field.SwitchField
-                    label="Pin to pull request"
-                    description="Shows this run above the CI runs on the pull request page"
+                  <field.TextField
+                    label="Commit SHA"
+                    description="The commit the traces were recorded against"
                   />
                 )}
               </form.AppField>
-            )}
-            <FieldSet>
-              <FieldLegend variant="label">CI pipeline (optional)</FieldLegend>
-              <FieldGroup>
-                <form.AppField name="externalRunId">
+              <form.AppField name="title">
+                {(field) => (
+                  <field.TextField
+                    label="Title"
+                    placeholder="Optional"
+                    description="Names the run, e.g. for pinned feature traces"
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="description">
+                {(field) => (
+                  <field.TextareaField
+                    label="Description"
+                    placeholder="Optional"
+                  />
+                )}
+              </form.AppField>
+              {target.kind === 'pull' && (
+                <form.AppField name="pinned">
                   {(field) => (
-                    <field.TextField
-                      label="Pipeline run ID"
-                      description="Uploads with the same pipeline, job and commit share one run"
+                    <field.SwitchField
+                      label="Pin to pull request"
+                      description="Shows this run above the CI runs on the pull request page"
                     />
                   )}
                 </form.AppField>
-                <form.AppField name="externalJobId">
-                  {(field) => (
-                    <field.TextField
-                      label="Job ID"
-                      description="Links the run to that job of the Git host's CI"
-                    />
-                  )}
-                </form.AppField>
-                <form.AppField name="jobName">
-                  {(field) => <field.TextField label="Job name" />}
-                </form.AppField>
-                <form.AppField name="ciUrl">
-                  {(field) => <field.TextField label="Pipeline URL" />}
-                </form.AppField>
-              </FieldGroup>
-            </FieldSet>
-          </>
-        )}
-      </FieldGroup>
-      <TraceUploadList form={form} progress={progress} />
-      <ErrorAlert error={submit.error} />
-      <form.AppForm>
+              )}
+              <FieldSet>
+                <FieldLegend variant="label">
+                  CI pipeline (optional)
+                </FieldLegend>
+                <FieldGroup>
+                  <form.AppField name="externalRunId">
+                    {(field) => (
+                      <field.TextField
+                        label="Pipeline run ID"
+                        description="Uploads with the same pipeline, job and commit share one run"
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="externalJobId">
+                    {(field) => (
+                      <field.TextField
+                        label="Job ID"
+                        description="Links the run to that job of the Git host's CI"
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="jobName">
+                    {(field) => <field.TextField label="Job name" />}
+                  </form.AppField>
+                  <form.AppField name="ciUrl">
+                    {(field) => <field.TextField label="Pipeline URL" />}
+                  </form.AppField>
+                </FieldGroup>
+              </FieldSet>
+            </>
+          )}
+        </FieldGroup>
+        <TraceUploadList form={form} progress={progress} />
+        <ErrorAlert error={submit.error} />
         <form.SubmitButton>Upload traces</form.SubmitButton>
-      </form.AppForm>
-    </form>
+      </form.FormElement>
+    </form.AppForm>
   )
 }

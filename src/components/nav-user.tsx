@@ -1,6 +1,15 @@
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, User } from 'lucide-react'
+import {
+  ChevronsUpDown,
+  LogOut,
+  Monitor,
+  Moon,
+  ShieldCheck,
+  Sun,
+  User,
+} from 'lucide-react'
 import { authClient } from '#/lib/auth-client'
+import { isAdminRole } from '#/lib/roles'
 import { useTheme } from '#/components/theme-provider'
 import type { Theme } from '#/components/theme-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar'
@@ -35,7 +44,7 @@ export function NavUser() {
   if (isPending) return <Skeleton className="h-12 w-full" />
   if (!session) return null
 
-  const { name, email, image } = session.user
+  const { name, email, image, role } = session.user
   const initial = name.charAt(0).toUpperCase()
 
   const signOut = async () => {
@@ -54,11 +63,15 @@ export function NavUser() {
             >
               <Avatar className="size-8 rounded-lg">
                 <AvatarImage src={image ?? undefined} alt={name} />
-                <AvatarFallback className="rounded-lg">{initial}</AvatarFallback>
+                <AvatarFallback className="rounded-lg">
+                  {initial}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{name}</span>
-                <span className="truncate text-xs text-muted-foreground">{email}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {email}
+                </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -75,6 +88,14 @@ export function NavUser() {
                 Profile
               </Link>
             </DropdownMenuItem>
+            {isAdminRole(role) && (
+              <DropdownMenuItem asChild>
+                <Link to="/admin">
+                  <ShieldCheck />
+                  Admin
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <div className="flex items-center justify-between px-2 py-1.5">
               <span className="text-sm">Theme</span>

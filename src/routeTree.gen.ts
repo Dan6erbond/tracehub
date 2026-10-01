@@ -10,9 +10,15 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as InitialSetupRouteImport } from './routes/initial-setup'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppMeRouteImport } from './routes/_app/me'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AppReposRepoIdRouteImport } from './routes/_app/repos.$repoId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppReposRepoIdIndexRouteImport } from './routes/_app/repos.$repoId.index'
@@ -30,9 +36,24 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InitialSetupRoute = InitialSetupRouteImport.update({
+  id: '/initial-setup',
+  path: '/initial-setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -44,6 +65,21 @@ const AppMeRoute = AppMeRouteImport.update({
   id: '/me',
   path: '/me',
   getParentRoute: () => AppRoute,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AppReposRepoIdRoute = AppReposRepoIdRouteImport.update({
   id: '/repos/$repoId',
@@ -115,8 +151,14 @@ const ApiReposRepoIdTracesTraceIdTraceDotzipRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/initial-setup': typeof InitialSetupRoute
   '/login': typeof LoginRoute
+  '/sign-up': typeof SignUpRoute
   '/me': typeof AppMeRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/': typeof AdminIndexRoute
   '/repos/$repoId': typeof AppReposRepoIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/repos/$repoId/': typeof AppReposRepoIdIndexRoute
@@ -131,9 +173,14 @@ export interface FileRoutesByFullPath {
   '/api/repos/$repoId/traces/$traceId/trace.zip': typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
 export interface FileRoutesByTo {
+  '/initial-setup': typeof InitialSetupRoute
   '/login': typeof LoginRoute
+  '/sign-up': typeof SignUpRoute
   '/me': typeof AppMeRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
   '/': typeof AppIndexRoute
+  '/admin': typeof AdminIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/repos/$repoId': typeof AppReposRepoIdIndexRoute
   '/repos/$repoId/branches/$': typeof AppReposRepoIdBranchesSplatRoute
@@ -149,9 +196,15 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/admin': typeof AdminRouteWithChildren
+  '/initial-setup': typeof InitialSetupRoute
   '/login': typeof LoginRoute
+  '/sign-up': typeof SignUpRoute
   '/_app/me': typeof AppMeRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
   '/_app/': typeof AppIndexRoute
+  '/admin/': typeof AdminIndexRoute
   '/_app/repos/$repoId': typeof AppReposRepoIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/repos/$repoId/': typeof AppReposRepoIdIndexRoute
@@ -169,8 +222,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
+    | '/initial-setup'
     | '/login'
+    | '/sign-up'
     | '/me'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/admin/'
     | '/repos/$repoId'
     | '/api/auth/$'
     | '/repos/$repoId/'
@@ -185,9 +244,14 @@ export interface FileRouteTypes {
     | '/api/repos/$repoId/traces/$traceId/trace.zip'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/initial-setup'
     | '/login'
+    | '/sign-up'
     | '/me'
+    | '/admin/settings'
+    | '/admin/users'
     | '/'
+    | '/admin'
     | '/api/auth/$'
     | '/repos/$repoId'
     | '/repos/$repoId/branches/$'
@@ -202,9 +266,15 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/admin'
+    | '/initial-setup'
     | '/login'
+    | '/sign-up'
     | '/_app/me'
+    | '/admin/settings'
+    | '/admin/users'
     | '/_app/'
+    | '/admin/'
     | '/_app/repos/$repoId'
     | '/api/auth/$'
     | '/_app/repos/$repoId/'
@@ -221,7 +291,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  AdminRoute: typeof AdminRouteWithChildren
+  InitialSetupRoute: typeof InitialSetupRoute
   LoginRoute: typeof LoginRoute
+  SignUpRoute: typeof SignUpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiReposRepoIdTracesTraceIdTraceDotzipRoute: typeof ApiReposRepoIdTracesTraceIdTraceDotzipRoute
 }
@@ -235,11 +308,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/initial-setup': {
+      id: '/initial-setup'
+      path: '/initial-setup'
+      fullPath: '/initial-setup'
+      preLoaderRoute: typeof InitialSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/': {
@@ -255,6 +349,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/me'
       preLoaderRoute: typeof AppMeRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/_app/repos/$repoId': {
       id: '/_app/repos/$repoId'
@@ -386,9 +501,26 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface AdminRouteChildren {
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  AdminRoute: AdminRouteWithChildren,
+  InitialSetupRoute: InitialSetupRoute,
   LoginRoute: LoginRoute,
+  SignUpRoute: SignUpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiReposRepoIdTracesTraceIdTraceDotzipRoute:
     ApiReposRepoIdTracesTraceIdTraceDotzipRoute,

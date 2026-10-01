@@ -21,6 +21,10 @@ export const tables = {
     image: v.optional(v.union(v.null(), v.string())),
     createdAt: v.number(),
     updatedAt: v.number(),
+    role: v.optional(v.union(v.null(), v.string())),
+    banned: v.optional(v.union(v.null(), v.boolean())),
+    banReason: v.optional(v.union(v.null(), v.string())),
+    banExpires: v.optional(v.union(v.null(), v.number())),
     userId: v.optional(v.union(v.null(), v.string())),
     theme: v.optional(v.union(v.null(), v.string())),
   })
@@ -35,6 +39,7 @@ export const tables = {
     ipAddress: v.optional(v.union(v.null(), v.string())),
     userAgent: v.optional(v.union(v.null(), v.string())),
     userId: v.string(),
+    impersonatedBy: v.optional(v.union(v.null(), v.string())),
   })
     .index('expiresAt', ['expiresAt'])
     .index('expiresAt_userId', ['expiresAt', 'userId'])
@@ -73,6 +78,11 @@ export const tables = {
     createdAt: v.number(),
     expiresAt: v.optional(v.union(v.null(), v.number())),
   }),
+  rateLimit: defineTable({
+    key: v.string(),
+    count: v.number(),
+    lastRequest: v.number(),
+  }).index('key', ['key']),
 }
 
 const schema = defineSchema(tables)

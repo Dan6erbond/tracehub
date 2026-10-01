@@ -16,6 +16,7 @@ import {
   defaultThemeClassName,
   themeInitScript,
 } from '#/components/theme-provider'
+import { Toaster } from '#/components/ui/sonner'
 import { authClient } from '#/lib/auth-client'
 import { getToken } from '#/lib/auth-server'
 
@@ -77,6 +78,7 @@ function RootComponent() {
     >
       <ThemeProvider>
         <Outlet />
+        <Toaster />
       </ThemeProvider>
     </ConvexBetterAuthProvider>
   )
