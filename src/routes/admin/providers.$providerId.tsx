@@ -3,6 +3,7 @@ import { zid } from 'convex-helpers/server/zod4'
 import { z } from 'zod'
 import { BackLink } from '#/components/back-link'
 import { NotFound } from '#/components/not-found'
+import { InlineCode } from '#/components/inline-code'
 import { PageTitle } from '#/components/page-title'
 import { CallbackUrl } from '#/components/providers/callback-url'
 import { EditProviderForm } from '#/components/providers/edit-provider-form'
@@ -39,7 +40,14 @@ function ProviderPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <BackLink to="/admin/providers">Git providers</BackLink>
-      <PageTitle title={provider.name} description={`Slug: ${provider.slug}`}>
+      <PageTitle
+        title={provider.name}
+        description={
+          <>
+            Slug <InlineCode>{provider.slug}</InlineCode>
+          </>
+        }
+      >
         <Badge variant="secondary" className="capitalize">
           {provider.type}
         </Badge>
