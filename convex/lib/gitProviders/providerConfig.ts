@@ -11,6 +11,7 @@ export const toProviderConfig = ({
   baseUrl,
   apiUrl,
   enabled,
+  trustedForLinking,
 }: Doc<'gitProviders'>): ProviderConfig => ({
   _id,
   slug,
@@ -19,6 +20,7 @@ export const toProviderConfig = ({
   baseUrl,
   apiUrl,
   enabled,
+  trustedForLinking,
 })
 
 type ProviderLoadingCtx = QueryCtx | MutationCtx | ActionCtx

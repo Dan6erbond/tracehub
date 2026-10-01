@@ -38,7 +38,7 @@ function useUnlinkAccount() {
   })
 }
 
-/** The user's sign-in methods, named after their providers, and the enabled providers they can still connect. Expects a loader to have ensured the public providers. */
+/** The user's sign-in methods, named after their providers, and the enabled providers trusted for linking they can still connect. Expects a loader to have ensured the public providers. */
 export function useLinkedAccounts() {
   const accounts = useAccounts()
   const providers = usePublicProviders()
@@ -63,7 +63,10 @@ export function useLinkedAccounts() {
     ),
     isPending: accounts.isPending,
     error: accounts.error,
-    connectable: providers.filter(({ slug }) => !linkedIds.has(slug)),
+    connectable: providers.filter(
+      ({ slug, trustedForLinking }) =>
+        trustedForLinking && !linkedIds.has(slug),
+    ),
     link,
     unlink,
   }

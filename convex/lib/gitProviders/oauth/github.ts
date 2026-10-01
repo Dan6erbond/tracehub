@@ -32,7 +32,9 @@ const fetchJson = async <T>(url: string, accessToken: string) => {
       'user-agent': 'tracehub',
     },
   })
-  return response.ok ? ((await response.json()) as T) : null
+  if (response.ok) return (await response.json()) as T
+  console.warn(`GET ${url} answered ${response.status}`)
+  return null
 }
 
 /**
@@ -88,6 +90,10 @@ export const githubOAuthProvider = (
         `${apiUrl}/user/emails`,
         accessToken,
       )
+      if (!emails)
+        console.warn(
+          `${provider.slug}: the email addresses of ${profile.login} could not be read, so the email counts as unverified. A GitHub App needs the "Email addresses" account permission`,
+        )
       // A link or sign-in on an unverified address would let anyone claim it, so a verified one is preferred over the public profile email.
       const chosen =
         emails?.find((e) => e.primary && e.verified) ??

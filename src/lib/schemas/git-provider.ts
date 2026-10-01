@@ -62,6 +62,7 @@ export const gitProviderPublicSchema = gitProviderSchema.pick({
   slug: true,
   name: true,
   type: true,
+  trustedForLinking: true,
 })
 export type GitProviderPublic = z.infer<typeof gitProviderPublicSchema>
 

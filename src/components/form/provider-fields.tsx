@@ -95,7 +95,7 @@ export const ProviderFields = withFieldGroup({
         {(field) => (
           <field.SwitchField
             label="Trusted for linking"
-            description="Signing in with this provider may attach it to an existing account with the same email. Users can always connect it from their profile"
+            description="Users can connect it to their account from their profile, and signing in with it may attach it to an existing account with the same email. Only enable for hosts you trust to verify emails"
           />
         )}
       </group.AppField>

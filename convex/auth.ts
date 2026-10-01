@@ -26,6 +26,7 @@ export const authComponent = createClient<DataModel, typeof authSchema>(
 
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
   const { gateUserCreation, gateAccountLinking } = createSignUpGates(ctx)
+  const loadProviders = createProviderLoader(ctx)
   return {
     baseURL: env.SITE_URL,
     secret: env.BETTER_AUTH_SECRET,
@@ -37,6 +38,11 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
         enabled: true,
         // A forge account's email often differs from the password account's.
         allowDifferentEmails: true,
+        // Lets these providers link even when the host reports the email as unverified; `gateAccountLinking` keeps implicit linking to them.
+        trustedProviders: async () =>
+          (await loadProviders().catch(() => []))
+            .filter(({ provider }) => provider.trustedForLinking)
+            .map(({ provider }) => provider.slug),
       },
     },
     user: {
@@ -56,7 +62,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
     },
     plugins: [
       admin(),
-      gitProvidersPlugin(createProviderLoader(ctx)),
+      gitProvidersPlugin(loadProviders),
       convex({ authConfig }),
     ],
   } satisfies BetterAuthOptions

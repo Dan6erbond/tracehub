@@ -128,7 +128,12 @@ export const listPublic = zQuery({
       internal.gitProviders.listEnabled,
       {},
     )
-    return providers.map(({ slug, name, type }) => ({ slug, name, type }))
+    return providers.map(({ slug, name, type, trustedForLinking }) => ({
+      slug,
+      name,
+      type,
+      trustedForLinking,
+    }))
   },
 })
 

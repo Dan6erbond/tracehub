@@ -21,7 +21,7 @@ const authErrorMessages: Record<string, string> = {
   account_not_linked:
     'An account with this email already exists. Sign in to it first, then connect this provider on your profile page.',
   unable_to_link_account:
-    'This account could not be linked. A provider that is not trusted for linking can only be connected from your profile page, and its email must be verified.',
+    'This account could not be linked. Only providers trusted for linking can be connected to an existing account.',
   account_already_linked_to_different_user:
     'This account is already linked to another user.',
   unable_to_create_user: 'The account could not be created.',

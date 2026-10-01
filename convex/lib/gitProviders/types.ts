@@ -10,7 +10,14 @@ export type RepoRef = Pick<Repo, 'owner' | 'name'>
 /** A provider row without the client credentials, for everything that talks to the host or links to it. */
 export type ProviderConfig = Pick<
   Doc<'gitProviders'>,
-  '_id' | 'slug' | 'type' | 'name' | 'baseUrl' | 'apiUrl' | 'enabled'
+  | '_id'
+  | 'slug'
+  | 'type'
+  | 'name'
+  | 'baseUrl'
+  | 'apiUrl'
+  | 'enabled'
+  | 'trustedForLinking'
 >
 
 export interface Credentials {
